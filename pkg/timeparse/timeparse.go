@@ -7,14 +7,22 @@ import (
 	"time"
 )
 
-// Parse парсит гибкое время из строки
-// Поддерживаемые форматы:
-//   - "now" или "" - текущее время
-//   - "+30m", "-1h", "+2d" - относительное время
-//   - "15:00", "09:30" - только время (сегодня)
-//   - "23.06 15:00" - дата и время (текущий год)
-//   - "23.06.2026" - только дата
-//   - ISO формат (RFC3339)
+var formatsWithTZ = []string{
+	time.RFC3339,
+	time.RFC3339Nano,
+	"2006-01-02T15:04:05Z07:00",
+	"2006-01-02T15:04:05.999999999Z07:00",
+}
+
+var formatsWithoutTZ = []string{
+	"2006-01-02T15:04:05",
+	"2006-01-02T15:04",
+	"2006-01-02 15:04:05",
+	"2006-01-02 15:04",
+	"02.01.2006 15:04:05",
+	"02.01.2006 15:04",
+}
+
 func Parse(input string) (time.Time, error) {
 	input = strings.TrimSpace(input)
 	now := time.Now()
@@ -27,24 +35,26 @@ func Parse(input string) (time.Time, error) {
 		return parseRelative(input, now)
 	}
 
+	for _, format := range formatsWithTZ {
+		if parsed, err := time.Parse(format, input); err == nil {
+			return parsed, nil
+		}
+	}
+
+	for _, format := range formatsWithoutTZ {
+		if parsed, err := time.ParseInLocation(format, input, now.Location()); err == nil {
+			return parsed, nil
+		}
+	}
+
 	if len(input) == 5 && strings.Count(input, ":") == 1 {
 		return parseTimeOnly(input, now)
 	}
-
 	if len(input) == 11 && strings.Count(input, ".") == 1 && strings.Count(input, ":") == 1 {
 		return parseDateTime(input, now)
 	}
-
 	if len(input) == 10 && strings.Count(input, ".") == 2 {
 		return parseDateOnly(input, now)
-	}
-
-	if t, err := time.Parse(time.RFC3339, input); err == nil {
-		return t, nil
-	}
-
-	if t, err := time.Parse("2006-01-02 15:04:05", input); err == nil {
-		return t, nil
 	}
 
 	return time.Time{}, fmt.Errorf("не удалось распарсить время: %s", input)
@@ -170,25 +180,27 @@ func parseDateOnly(input string, now time.Time) (time.Time, error) {
 
 func TodayStart() string {
 	now := time.Now()
-	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).Format(time.RFC3339)
+	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).
+		UTC().
+		Format(time.RFC3339)
 }
 
 func WeekAgo() string {
-	return time.Now().AddDate(0, 0, -7).Format(time.RFC3339)
+	return time.Now().AddDate(0, 0, -7).UTC().Format(time.RFC3339)
 }
 
 func MonthAgo() string {
-	return time.Now().AddDate(0, -1, 0).Format(time.RFC3339)
+	return time.Now().AddDate(0, -1, 0).UTC().Format(time.RFC3339)
 }
 
 func FormatDateTime(t time.Time) string {
-	return t.Format("02.01.2006 15:04")
+	return t.Local().Format("02.01.2006 15:04")
 }
 
 func FormatDate(t time.Time) string {
-	return t.Format("02.01.2006")
+	return t.Local().Format("02.01.2006")
 }
 
 func FormatTime(t time.Time) string {
-	return t.Format("15:04")
+	return t.Local().Format("15:04")
 }

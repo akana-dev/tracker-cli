@@ -1,15 +1,16 @@
 package models
 
 import (
+	"fmt"
 	"strings"
 	"time"
 )
 
 var timeFormats = []string{
-	"2006-01-02T15:04:05.999999999",       // с микросекундами, без TZ
-	"2006-01-02T15:04:05.999999999Z07:00", // с микросекундами и TZ
-	"2006-01-02T15:04:05",                 // без микросекунд, без TZ
-	"2006-01-02T15:04:05Z07:00",           // RFC3339
+	"2006-01-02T15:04:05.999999999",
+	"2006-01-02T15:04:05.999999999Z07:00",
+	"2006-01-02T15:04:05",
+	"2006-01-02T15:04:05Z07:00",
 	time.RFC3339,
 	time.RFC3339Nano,
 }
@@ -39,7 +40,7 @@ func (t *FlexibleTime) UnmarshalJSON(data []byte) error {
 		}
 	}
 
-	return nil
+	return fmt.Errorf("не удалось распарсить время %q: ни один из известных форматов не подошёл", s)
 }
 
 func (t FlexibleTime) MarshalJSON() ([]byte, error) {
@@ -81,5 +82,5 @@ func (t *FlexibleTimePtr) UnmarshalJSON(data []byte) error {
 		}
 	}
 
-	return nil
+	return fmt.Errorf("не удалось распарсить время %q: ни один из известных форматов не подошёл", s)
 }

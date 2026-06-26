@@ -1,12 +1,22 @@
 package models
 
+import "fmt"
+
 type User struct {
 	ID        int          `json:"id"`
 	Username  string       `json:"username"`
 	Email     string       `json:"email"`
+	FullName  *string      `json:"full_name,omitempty"`
 	Role      string       `json:"role"`
 	IsActive  bool         `json:"is_active"`
 	CreatedAt FlexibleTime `json:"created_at"`
+}
+
+func (u *User) GetFullName() string {
+	if u.FullName != nil && *u.FullName != "" {
+		return *u.FullName
+	}
+	return u.Username
 }
 
 type TokenResponse struct {
@@ -25,8 +35,10 @@ type Task struct {
 	Solution           *string       `json:"solution,omitempty"`
 	UserID             int           `json:"user_id"`
 	OwnerUsername      string        `json:"owner_username"`
+	OwnerFullName      *string       `json:"owner_full_name,omitempty"`
 	AssigneeID         *int          `json:"assignee_id,omitempty"`
 	AssigneeUsername   *string       `json:"assignee_username,omitempty"`
+	AssigneeFullName   *string       `json:"assignee_full_name,omitempty"`
 	CompanyName        string        `json:"company_name"`
 	PausedAt           *FlexibleTime `json:"paused_at,omitempty"`
 	TotalWorkedSeconds int           `json:"total_worked_seconds"`
@@ -34,6 +46,42 @@ type Task struct {
 	Sessions           []TaskSession `json:"sessions"`
 	CanEdit            bool          `json:"can_edit"`
 	CanDelete          bool          `json:"can_delete"`
+}
+
+func (t *Task) GetAssigneeDisplay() string {
+	if t.AssigneeUsername == nil || *t.AssigneeUsername == "" || *t.AssigneeUsername == t.OwnerUsername {
+		return formatUserName(t.OwnerUsername, t.OwnerFullName)
+	}
+	return formatUserName(*t.AssigneeUsername, t.AssigneeFullName)
+}
+
+func (t *Task) GetOwnerDisplay() string {
+	return formatUserName(t.OwnerUsername, t.OwnerFullName)
+}
+
+func (t *Task) IsAssignedToSomeone() bool {
+	return t.AssigneeUsername != nil &&
+		*t.AssigneeUsername != "" &&
+		*t.AssigneeUsername != t.OwnerUsername
+}
+
+func (t *Task) IsClosed() bool {
+	return t.EndTime != nil && !t.EndTime.IsZero()
+}
+
+func (t *Task) IsPaused() bool {
+	return t.PausedAt != nil && !t.PausedAt.IsZero()
+}
+
+func (t *Task) IsActive() bool {
+	return !t.IsClosed() && !t.IsPaused()
+}
+
+func formatUserName(username string, fullName *string) string {
+	if fullName != nil && *fullName != "" && *fullName != username {
+		return fmt.Sprintf("%s (%s)", *fullName, username)
+	}
+	return username
 }
 
 type TaskSession struct {
@@ -74,4 +122,76 @@ type TaskSummary struct {
 	BySolution map[string]int `json:"by_solution"`
 	ByCompany  map[string]int `json:"by_company"`
 	ByAssignee map[string]int `json:"by_assignee"`
+}
+
+type TaskListResponse struct {
+	Tasks  []Task `json:"items"`
+	Total  int    `json:"total"`
+	Limit  int    `json:"limit"`
+	Offset int    `json:"offset"`
+}
+
+func (r *TaskListResponse) Pages() int {
+	if r.Limit <= 0 {
+		return 1
+	}
+	pages := r.Total / r.Limit
+	if r.Total%r.Limit > 0 {
+		pages++
+	}
+	if pages == 0 {
+		pages = 1
+	}
+	return pages
+}
+
+func (r *TaskListResponse) CurrentPage() int {
+	if r.Limit <= 0 {
+		return 1
+	}
+	return (r.Offset / r.Limit) + 1
+}
+
+func (r *TaskListResponse) HasNext() bool {
+	return r.Offset+len(r.Tasks) < r.Total
+}
+
+func (r *TaskListResponse) HasPrev() bool {
+	return r.Offset > 0
+}
+
+type CompanyListResponse struct {
+	Companies []Company `json:"items"`
+	Total     int       `json:"total"`
+	Limit     int       `json:"limit"`
+	Offset    int       `json:"offset"`
+}
+
+func (r *CompanyListResponse) Pages() int {
+	if r.Limit <= 0 {
+		return 1
+	}
+	pages := r.Total / r.Limit
+	if r.Total%r.Limit > 0 {
+		pages++
+	}
+	if pages == 0 {
+		pages = 1
+	}
+	return pages
+}
+
+func (r *CompanyListResponse) CurrentPage() int {
+	if r.Limit <= 0 {
+		return 1
+	}
+	return (r.Offset / r.Limit) + 1
+}
+
+func (r *CompanyListResponse) HasNext() bool {
+	return r.Offset+len(r.Companies) < r.Total
+}
+
+func (r *CompanyListResponse) HasPrev() bool {
+	return r.Offset > 0
 }

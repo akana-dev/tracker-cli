@@ -112,7 +112,14 @@ var meCmd = &cobra.Command{
 		fmt.Println()
 		ui.Header("Пользователь:")
 		ui.Label("ID", fmt.Sprintf("%d", user.ID))
-		ui.Label("Логин", ui.Cyan(user.Username))
+
+		if user.FullName != nil && *user.FullName != "" {
+			ui.Label("ФИО", ui.Bold(*user.FullName))
+			ui.Label("Логин", ui.Cyan(user.Username))
+		} else {
+			ui.Label("Логин", ui.Cyan(user.Username))
+		}
+
 		ui.Label("Email", user.Email)
 		ui.Label("Роль", ui.RoleColor(user.Role))
 		ui.Label("Активен", func() string {
@@ -189,10 +196,11 @@ func loginPassword() error {
 	if err := config.SaveToken(resp.AccessToken); err != nil {
 		return err
 	}
-	saveUserRole()
+
+	displayName := getUserDisplayName()
 
 	fmt.Println(ui.Checkmark(), ui.Successf("Вход выполнен через %s как %s",
-		ui.Bold("password"), ui.Bold(username)))
+		ui.Bold("password"), ui.Bold(displayName)))
 	return nil
 }
 
@@ -228,24 +236,28 @@ func loginAD() error {
 	if err := config.SaveToken(resp.AccessToken); err != nil {
 		return err
 	}
-	saveUserRole()
 
-	displayName := username
-	if idx := strings.Index(username, "@"); idx != -1 {
-		displayName = username[:idx]
-	} else if idx := strings.Index(username, "\\"); idx != -1 {
-		displayName = username[idx+1:]
-	}
+	displayName := getUserDisplayName()
 
 	fmt.Println(ui.Checkmark(), ui.Successf("Вход выполнен через %s как %s",
 		ui.Bold("AD"), ui.Bold(displayName)))
 	return nil
 }
 
-func saveUserRole() {
+func getUserDisplayName() string {
 	user, err := client.GetMe()
 	if err != nil {
-		return
+		return ""
 	}
+
 	config.SaveUserRole(user.Role)
+
+	return user.GetFullName()
+}
+
+func formatUserName(username string, fullName *string) string {
+	if fullName != nil && *fullName != "" && *fullName != username {
+		return fmt.Sprintf("%s (%s)", *fullName, username)
+	}
+	return username
 }

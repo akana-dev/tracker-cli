@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"tracker/internal/models"
 )
@@ -12,6 +13,11 @@ import (
 var (
 	ConfigDir   string
 	ServersFile string
+)
+
+var (
+	configCache *models.ServersConfig
+	configMu    sync.RWMutex
 )
 
 func init() {
@@ -23,11 +29,27 @@ func init() {
 	ServersFile = filepath.Join(ConfigDir, "servers.json")
 }
 
+func invalidateCache() {
+	configMu.Lock()
+	configCache = nil
+	configMu.Unlock()
+}
+
 func LoadServersConfig() (*models.ServersConfig, error) {
+	configMu.RLock()
+	if configCache != nil {
+		cached := configCache
+		configMu.RUnlock()
+		return cached, nil
+	}
+	configMu.RUnlock()
+
 	data, err := os.ReadFile(ServersFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return &models.ServersConfig{Servers: make(map[string]*models.Server)}, nil
+			cfg := &models.ServersConfig{Servers: make(map[string]*models.Server)}
+			setCache(cfg)
+			return cfg, nil
 		}
 		return nil, err
 	}
@@ -41,7 +63,14 @@ func LoadServersConfig() (*models.ServersConfig, error) {
 		config.Servers = make(map[string]*models.Server)
 	}
 
+	setCache(&config)
 	return &config, nil
+}
+
+func setCache(cfg *models.ServersConfig) {
+	configMu.Lock()
+	configCache = cfg
+	configMu.Unlock()
 }
 
 func SaveServersConfig(config *models.ServersConfig) error {
@@ -58,6 +87,7 @@ func SaveServersConfig(config *models.ServersConfig) error {
 		return err
 	}
 
+	setCache(config)
 	return nil
 }
 
@@ -139,6 +169,14 @@ func RemoveServer(name string) error {
 	return SaveServersConfig(config)
 }
 
+type ServerInfo struct {
+	Name      string
+	APIURL    string
+	IsCurrent bool
+	HasToken  bool
+	UserRole  string
+}
+
 func ListServers() ([]ServerInfo, error) {
 	config, err := LoadServersConfig()
 	if err != nil {
@@ -157,14 +195,6 @@ func ListServers() ([]ServerInfo, error) {
 	}
 
 	return result, nil
-}
-
-type ServerInfo struct {
-	Name      string
-	APIURL    string
-	IsCurrent bool
-	HasToken  bool
-	UserRole  string
 }
 
 func GetAPIURL() string {

@@ -2,9 +2,12 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -14,62 +17,245 @@ import (
 	"tracker/internal/models"
 )
 
-var httpClient = &http.Client{Timeout: 30 * time.Second}
+const (
+	httpTimeout    = 30 * time.Second
+	maxRetries     = 3
+	initialBackoff = 100 * time.Millisecond
+	maxBackoff     = 2 * time.Second
+)
 
-func doRequest(method, path string, body interface{}, result interface{}) error {
+var httpClient = &http.Client{Timeout: httpTimeout}
+
+func isRetryableError(err error, statusCode int) bool {
+	if err != nil {
+		var netErr net.Error
+		if errors.As(err, &netErr) && netErr.Timeout() {
+			return true
+		}
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			if urlErr.Timeout() {
+				return true
+			}
+			var opErr *net.OpError
+			if errors.As(urlErr.Err, &opErr) {
+				return true
+			}
+		}
+		return false
+	}
+
+	switch statusCode {
+	case http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout,
+		http.StatusRequestTimeout,
+		http.StatusTooManyRequests:
+		return true
+	default:
+		return false
+	}
+}
+
+func doRequestWithCtx(ctx context.Context, method, path string, body interface{}, result interface{}) error {
 	apiURL := config.GetAPIURL()
 	fullURL := apiURL + path
 
-	var reqBody io.Reader
+	var bodyBytes []byte
 	if body != nil {
-		data, err := json.Marshal(body)
+		var err error
+		bodyBytes, err = json.Marshal(body)
 		if err != nil {
 			return fmt.Errorf("ошибка сериализации: %w", err)
 		}
-		reqBody = bytes.NewReader(data)
 	}
 
-	req, err := http.NewRequest(method, fullURL, reqBody)
-	if err != nil {
-		return err
+	var lastErr error
+	backoff := initialBackoff
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(backoff):
+			}
+			backoff *= 2
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+		}
+
+		var reqBody io.Reader
+		if bodyBytes != nil {
+			reqBody = bytes.NewReader(bodyBytes)
+		}
+
+		req, err := http.NewRequestWithContext(ctx, method, fullURL, reqBody)
+		if err != nil {
+			return err
+		}
+
+		if body != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+
+		token := config.LoadToken()
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("ошибка сети: %w", err)
+			if isRetryableError(err, 0) && attempt < maxRetries {
+				continue
+			}
+			return lastErr
+		}
+
+		if resp.StatusCode == 401 {
+			resp.Body.Close()
+			return fmt.Errorf("сессия истекла. Выполните: tracker login")
+		}
+		if resp.StatusCode == 403 {
+			resp.Body.Close()
+			return fmt.Errorf("доступ запрещён")
+		}
+
+		if resp.StatusCode >= 400 {
+			bodyBytesResp, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+
+			if isRetryableError(nil, resp.StatusCode) && attempt < maxRetries {
+				lastErr = fmt.Errorf("ошибка %d: %s", resp.StatusCode, string(bodyBytesResp))
+				continue
+			}
+
+			var errResp struct {
+				Detail string `json:"detail"`
+			}
+			if err := json.Unmarshal(bodyBytesResp, &errResp); err == nil && errResp.Detail != "" {
+				return fmt.Errorf("ошибка %d: %s", resp.StatusCode, errResp.Detail)
+			}
+			return fmt.Errorf("ошибка %d: %s", resp.StatusCode, string(bodyBytesResp))
+		}
+
+		if result != nil {
+			if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
+				resp.Body.Close()
+				return err
+			}
+		}
+		resp.Body.Close()
+		return nil
 	}
 
+	return fmt.Errorf("превышено число попыток: %w", lastErr)
+}
+
+func doRequest(method, path string, body interface{}, result interface{}) error {
+	return doRequestWithCtx(context.Background(), method, path, body, result)
+}
+
+func doRawRequestWithCtx(ctx context.Context, method, path string, body interface{}) ([]byte, http.Header, error) {
+	apiURL := config.GetAPIURL()
+	fullURL := apiURL + path
+
+	var bodyBytes []byte
 	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	token := config.LoadToken()
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("ошибка сети: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 401 {
-		return fmt.Errorf("сессия истекла. Выполните: tracker login")
-	}
-	if resp.StatusCode == 403 {
-		return fmt.Errorf("доступ запрещён")
-	}
-	if resp.StatusCode >= 400 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		var errResp struct {
-			Detail string `json:"detail"`
+		var err error
+		bodyBytes, err = json.Marshal(body)
+		if err != nil {
+			return nil, nil, fmt.Errorf("ошибка сериализации: %w", err)
 		}
-		if err := json.Unmarshal(bodyBytes, &errResp); err == nil && errResp.Detail != "" {
-			return fmt.Errorf("ошибка %d: %s", resp.StatusCode, errResp.Detail)
-		}
-		return fmt.Errorf("ошибка %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
-	if result != nil {
-		return json.NewDecoder(resp.Body).Decode(result)
+	var lastErr error
+	backoff := initialBackoff
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, nil, ctx.Err()
+			case <-time.After(backoff):
+			}
+			backoff *= 2
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+		}
+
+		var reqBody io.Reader
+		if bodyBytes != nil {
+			reqBody = bytes.NewReader(bodyBytes)
+		}
+
+		req, err := http.NewRequestWithContext(ctx, method, fullURL, reqBody)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if body != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+
+		token := config.LoadToken()
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("ошибка сети: %w", err)
+			if isRetryableError(err, 0) && attempt < maxRetries {
+				continue
+			}
+			return nil, nil, lastErr
+		}
+
+		if resp.StatusCode == 401 {
+			resp.Body.Close()
+			return nil, nil, fmt.Errorf("сессия истекла. Выполните: tracker login")
+		}
+		if resp.StatusCode == 403 {
+			resp.Body.Close()
+			return nil, nil, fmt.Errorf("доступ запрещён")
+		}
+
+		if resp.StatusCode >= 400 {
+			bodyBytesResp, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+
+			if isRetryableError(nil, resp.StatusCode) && attempt < maxRetries {
+				lastErr = fmt.Errorf("ошибка %d: %s", resp.StatusCode, string(bodyBytesResp))
+				continue
+			}
+
+			var errResp struct {
+				Detail string `json:"detail"`
+			}
+			if err := json.Unmarshal(bodyBytesResp, &errResp); err == nil && errResp.Detail != "" {
+				return nil, nil, fmt.Errorf("ошибка %d: %s", resp.StatusCode, errResp.Detail)
+			}
+			return nil, nil, fmt.Errorf("ошибка %d: %s", resp.StatusCode, string(bodyBytesResp))
+		}
+
+		data, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return nil, nil, err
+		}
+
+		return data, resp.Header, nil
 	}
-	return nil
+
+	return nil, nil, fmt.Errorf("превышено число попыток: %w", lastErr)
+}
+
+func doRawRequest(method, path string, body interface{}) ([]byte, http.Header, error) {
+	return doRawRequestWithCtx(context.Background(), method, path, body)
 }
 
 func LoginPassword(username, password string) (*models.TokenResponse, error) {
@@ -78,7 +264,10 @@ func LoginPassword(username, password string) (*models.TokenResponse, error) {
 	data.Set("username", username)
 	data.Set("password", password)
 
-	req, err := http.NewRequest("POST", apiURL+"/auth/login", strings.NewReader(data.Encode()))
+	ctx, cancel := context.WithTimeout(context.Background(), httpTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL+"/auth/login", strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, err
 	}
@@ -135,45 +324,89 @@ func CreateTask(payload map[string]interface{}) (*models.Task, error) {
 	return &resp, err
 }
 
-func ListTasks(params map[string]string) ([]models.Task, error) {
-	apiURL := config.GetAPIURL()
-	fullURL := apiURL + "/tasks"
+func GetTaskByID(id int) (*models.Task, error) {
+	var resp models.Task
+	err := doRequest("GET", fmt.Sprintf("/tasks/%d", id), nil, &resp)
+	return &resp, err
+}
 
-	if len(params) > 0 {
-		values := url.Values{}
-		for k, v := range params {
-			values.Set(k, v)
+func GetTaskByTicket(ticket string) (*models.Task, error) {
+	params := map[string]string{
+		"ticket": ticket,
+		"limit":  "1",
+	}
+
+	resp, err := ListTasks(params, 1, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(resp.Tasks) == 0 {
+		return nil, fmt.Errorf("тикет %s не найден", ticket)
+	}
+
+	return &resp.Tasks[0], nil
+}
+func ListTasks(params map[string]string, limit, offset int) (*models.TaskListResponse, error) {
+	values := url.Values{}
+	for k, v := range params {
+		if k == "limit" || k == "offset" {
+			continue
 		}
-		fullURL += "?" + values.Encode()
+		values.Set(k, v)
 	}
 
-	req, err := http.NewRequest("GET", fullURL, nil)
+	if limit > 0 {
+		values.Set("limit", fmt.Sprintf("%d", limit))
+	}
+	if offset > 0 {
+		values.Set("offset", fmt.Sprintf("%d", offset))
+	}
+
+	path := "/tasks"
+	if len(values) > 0 {
+		path += "?" + values.Encode()
+	}
+
+	data, _, err := doRawRequest("GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	token := config.LoadToken()
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
+	trimmed := bytes.TrimLeft(data, " \t\r\n")
+	if len(trimmed) == 0 {
+		return &models.TaskListResponse{}, nil
 	}
 
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("ошибка сети: %w", err)
-	}
-	defer resp.Body.Close()
+	var resp models.TaskListResponse
 
-	if resp.StatusCode != 200 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("ошибка %d: %s", resp.StatusCode, string(bodyBytes))
+	if trimmed[0] == '[' {
+		var tasks []models.Task
+		if err := json.Unmarshal(data, &tasks); err != nil {
+			return nil, fmt.Errorf("ошибка парсинга массива задач: %w", err)
+		}
+		resp.Tasks = tasks
+		resp.Total = len(tasks)
+		resp.Limit = limit
+		resp.Offset = offset
+	} else if trimmed[0] == '{' {
+		if err := json.Unmarshal(data, &resp); err != nil {
+			return nil, fmt.Errorf("ошибка парсинга структуры задач: %w", err)
+		}
+		if resp.Total == 0 {
+			resp.Total = len(resp.Tasks)
+		}
+		if resp.Limit == 0 && limit > 0 {
+			resp.Limit = limit
+		}
+		if resp.Offset == 0 && offset > 0 {
+			resp.Offset = offset
+		}
+	} else {
+		return nil, fmt.Errorf("неожиданный формат ответа сервера")
 	}
 
-	var tasks []models.Task
-	if err := json.NewDecoder(resp.Body).Decode(&tasks); err != nil {
-		return nil, err
-	}
-
-	return tasks, nil
+	return &resp, nil
 }
 
 func UpdateTask(taskID int, payload map[string]interface{}) (*models.Task, error) {
@@ -199,50 +432,97 @@ func ResumeTask(taskID int) (*models.Task, error) {
 }
 
 func GetTaskSummary(params map[string]string) (*models.TaskSummary, error) {
-	apiURL := config.GetAPIURL()
-	fullURL := apiURL + "/tasks/summary"
-
+	path := "/tasks/summary"
 	if len(params) > 0 {
 		values := url.Values{}
 		for k, v := range params {
 			values.Set(k, v)
 		}
-		fullURL += "?" + values.Encode()
+		path += "?" + values.Encode()
 	}
 
-	req, err := http.NewRequest("GET", fullURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	token := config.LoadToken()
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("ошибка сети: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("ошибка %d: %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	var summary models.TaskSummary
-	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
-		return nil, err
-	}
-
-	return &summary, nil
+	var resp models.TaskSummary
+	err := doRequest("GET", path, nil, &resp)
+	return &resp, err
 }
 
-func ListCompanies() ([]models.Company, error) {
-	var resp []models.Company
-	err := doRequest("GET", "/companies", nil, &resp)
-	return resp, err
+func ExportTasks(format string, params map[string]string) ([]byte, string, error) {
+	values := url.Values{}
+	values.Set("format", format)
+	for k, v := range params {
+		values.Set(k, v)
+	}
+	path := "/tasks/export?" + values.Encode()
+
+	data, headers, err := doRawRequest("GET", path, nil)
+	if err != nil {
+		return nil, "", err
+	}
+
+	filename := fmt.Sprintf("tasks.%s", format)
+	if contentDisp := headers.Get("Content-Disposition"); strings.Contains(contentDisp, "filename=") {
+		parts := strings.Split(contentDisp, "filename=")
+		if len(parts) > 1 {
+			filename = strings.Trim(parts[1], "\"")
+		}
+	}
+
+	return data, filename, nil
+}
+
+func ListCompanies(limit, offset int) (*models.CompanyListResponse, error) {
+	values := url.Values{}
+	if limit > 0 {
+		values.Set("limit", fmt.Sprintf("%d", limit))
+	}
+	if offset > 0 {
+		values.Set("offset", fmt.Sprintf("%d", offset))
+	}
+
+	path := "/companies"
+	if len(values) > 0 {
+		path += "?" + values.Encode()
+	}
+
+	data, _, err := doRawRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	trimmed := bytes.TrimLeft(data, " \t\r\n")
+	if len(trimmed) == 0 {
+		return &models.CompanyListResponse{}, nil
+	}
+
+	var resp models.CompanyListResponse
+
+	if trimmed[0] == '[' {
+		var companies []models.Company
+		if err := json.Unmarshal(data, &companies); err != nil {
+			return nil, fmt.Errorf("ошибка парсинга массива компаний: %w", err)
+		}
+		resp.Companies = companies
+		resp.Total = len(companies)
+		resp.Limit = limit
+		resp.Offset = offset
+	} else if trimmed[0] == '{' {
+		if err := json.Unmarshal(data, &resp); err != nil {
+			return nil, fmt.Errorf("ошибка парсинга структуры компаний: %w", err)
+		}
+		if resp.Total == 0 {
+			resp.Total = len(resp.Companies)
+		}
+		if resp.Limit == 0 && limit > 0 {
+			resp.Limit = limit
+		}
+		if resp.Offset == 0 && offset > 0 {
+			resp.Offset = offset
+		}
+	} else {
+		return nil, fmt.Errorf("неожиданный формат ответа сервера")
+	}
+
+	return &resp, nil
 }
 
 func CreateCompany(name, description string) (*models.Company, error) {
@@ -256,7 +536,7 @@ func CreateCompany(name, description string) (*models.Company, error) {
 }
 
 func DeleteCompany(name string) error {
-	return doRequest("DELETE", fmt.Sprintf("/companies/%s", name), nil, nil)
+	return doRequest("DELETE", fmt.Sprintf("/companies/%s", url.PathEscape(name)), nil, nil)
 }
 
 func ListUsers() ([]models.User, error) {
@@ -267,54 +547,5 @@ func ListUsers() ([]models.User, error) {
 
 func UpdateUserRole(username, role string) error {
 	payload := map[string]string{"role": role}
-	return doRequest("PUT", fmt.Sprintf("/auth/users/%s/role", username), payload, nil)
-}
-
-func ExportTasks(format string, params map[string]string) ([]byte, string, error) {
-	apiURL := config.GetAPIURL()
-	fullURL := apiURL + "/tasks/export"
-
-	values := url.Values{}
-	values.Set("format", format)
-	for k, v := range params {
-		values.Set(k, v)
-	}
-	fullURL += "?" + values.Encode()
-
-	req, err := http.NewRequest("GET", fullURL, nil)
-	if err != nil {
-		return nil, "", err
-	}
-
-	token := config.LoadToken()
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, "", fmt.Errorf("ошибка сети: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, "", fmt.Errorf("ошибка %d: %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, "", err
-	}
-
-	contentDisp := resp.Header.Get("Content-Disposition")
-	filename := fmt.Sprintf("tasks.%s", format)
-	if strings.Contains(contentDisp, "filename=") {
-		parts := strings.Split(contentDisp, "filename=")
-		if len(parts) > 1 {
-			filename = strings.Trim(parts[1], "\"")
-		}
-	}
-
-	return data, filename, nil
+	return doRequest("PUT", fmt.Sprintf("/auth/users/%s/role", url.PathEscape(username)), payload, nil)
 }

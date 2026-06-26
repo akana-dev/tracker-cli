@@ -21,10 +21,42 @@ var companyListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "Показать список компаний",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		companies, err := client.ListCompanies()
+		all, _ := cmd.Flags().GetBool("all")
+		page, _ := cmd.Flags().GetInt("page")
+		limit, _ := cmd.Flags().GetInt("limit")
+		offset, _ := cmd.Flags().GetInt("offset")
+
+		if cmd.Flags().Changed("page") && cmd.Flags().Changed("offset") {
+			return fmt.Errorf("нельзя использовать --page и --offset одновременно")
+		}
+		if page < 1 {
+			return fmt.Errorf("--page должен быть >= 1")
+		}
+		if offset < 0 {
+			return fmt.Errorf("--offset должен быть >= 0")
+		}
+		if limit < 0 {
+			return fmt.Errorf("--limit должен быть >= 0")
+		}
+
+		if all {
+			limit = 0
+			offset = 0
+		} else {
+			if !cmd.Flags().Changed("limit") {
+				limit = defaultPageSize
+			}
+			if cmd.Flags().Changed("page") && page > 1 {
+				offset = (page - 1) * limit
+			}
+		}
+
+		resp, err := client.ListCompanies(limit, offset)
 		if err != nil {
 			return err
 		}
+
+		companies := resp.Companies
 
 		if len(companies) == 0 {
 			fmt.Println(ui.Warning("Компании не найдены."))
@@ -32,6 +64,25 @@ var companyListCmd = &cobra.Command{
 		}
 
 		fmt.Println()
+
+		if limit > 0 && resp.Total > 0 {
+			currentPage := resp.CurrentPage()
+			totalPages := resp.Pages()
+			startIdx := resp.Offset + 1
+			endIdx := resp.Offset + len(companies)
+
+			fmt.Printf("%s Найдено: %s | Страница: %s | Показано: %s\n",
+				ui.Bold("Компании:"),
+				ui.Bold(fmt.Sprintf("%d", resp.Total)),
+				ui.Cyan(fmt.Sprintf("%d из %d", currentPage, totalPages)),
+				ui.Dim(fmt.Sprintf("%d-%d", startIdx, endIdx)))
+		} else {
+			fmt.Printf("%s Найдено: %s\n",
+				ui.Bold("Компании:"),
+				ui.Bold(fmt.Sprintf("%d", resp.Total)))
+		}
+		fmt.Println()
+
 		tbl := table.New("ID", "Название", "Описание", "След. номер")
 		for _, c := range companies {
 			desc := "—"
@@ -46,6 +97,15 @@ var companyListCmd = &cobra.Command{
 			)
 		}
 		tbl.Render()
+
+		if limit > 0 && resp.HasNext() {
+			fmt.Println()
+			currentPage := resp.CurrentPage()
+			nextPage := currentPage + 1
+			fmt.Println(ui.Dimf("Следующая страница: %s | Показать все: %s",
+				ui.Cyan(fmt.Sprintf("--page %d", nextPage)),
+				ui.Cyan("--all")))
+		}
 		fmt.Println()
 
 		return nil
@@ -96,6 +156,11 @@ var companyDeleteCmd = &cobra.Command{
 
 func init() {
 	companyAddCmd.Flags().StringP("description", "d", "", "Описание")
+
+	companyListCmd.Flags().Bool("all", false, "Показать все компании (без пагинации)")
+	companyListCmd.Flags().Int("page", 1, "Номер страницы")
+	companyListCmd.Flags().Int("limit", defaultPageSize, "Количество компаний на странице")
+	companyListCmd.Flags().Int("offset", 0, "Смещение от начала")
 
 	companyCmd.AddCommand(companyListCmd)
 	companyCmd.AddCommand(companyAddCmd)
