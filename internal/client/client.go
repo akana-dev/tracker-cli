@@ -540,13 +540,13 @@ func DeleteCompany(name string) error {
 
 func ListUsers() ([]models.User, error) {
 	var resp []models.User
-	err := doRequest("GET", "/tasks/users", nil, &resp)
+	err := doRequest("GET", "/users", nil, &resp)
 	return resp, err
 }
 
 func UpdateUserRole(username, role string) error {
 	payload := map[string]string{"role": role}
-	return doRequest("PUT", fmt.Sprintf("/auth/users/%s/role", url.PathEscape(username)), payload, nil)
+	return doRequest("PUT", fmt.Sprintf("/users/%s/role", url.PathEscape(username)), payload, nil)
 }
 
 func ListComments(taskID int, limit, offset int) ([]models.Comment, error) {
