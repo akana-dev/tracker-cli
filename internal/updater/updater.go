@@ -70,6 +70,12 @@ func DownloadAndInstall(releaseURL, expectedVersion string) error {
 		return fmt.Errorf("ошибка обновления: %w", err)
 	}
 
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(execPath, 0755); err != nil {
+			return fmt.Errorf("не удалось установить права: %w", err)
+		}
+	}
+
 	fmt.Println("Обновление успешно завершено!")
 	return nil
 }
@@ -258,18 +264,29 @@ func replaceBinary(newBinaryPath, targetPath string) error {
 		return fmt.Errorf("ошибка копирования нового бинарника: %w", err)
 	}
 
+	if err := os.Chmod(targetPath, 0755); err != nil {
+		os.Remove(targetPath)
+		os.Rename(oldPath, targetPath)
+		return fmt.Errorf("не удалось установить права на выполнение: %w", err)
+	}
+
 	os.Remove(oldPath)
 	return nil
 }
 
 func copyFile(src, dst string) error {
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
 	sourceFile, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer sourceFile.Close()
 
-	destFile, err := os.Create(dst)
+	destFile, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, srcInfo.Mode())
 	if err != nil {
 		return err
 	}

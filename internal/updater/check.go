@@ -49,35 +49,23 @@ func CheckForUpdate(ctx context.Context, owner, repo string, includePreRelease b
 
 	currentVersion := getCurrentVersion()
 
-	url := fmt.Sprintf(githubAPIURL, owner, repo)
-
 	reqCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(reqCtx, "GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("ошибка создания запроса: %w", err)
-	}
-
-	req.Header.Set("User-Agent", "tracker-cli/"+currentVersion)
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("ошибка сети: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("GitHub API вернул статус %d", resp.StatusCode)
-	}
-
 	var release GitHubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return nil, fmt.Errorf("ошибка парсинга ответа: %w", err)
+	var err error
+
+	if includePreRelease {
+		release, err = getLatestReleaseIncludingPreRelease(reqCtx, owner, repo)
+	} else {
+		release, err = getLatestStableRelease(reqCtx, owner, repo)
 	}
 
-	if release.Draft || (!includePreRelease && release.Prerelease) {
+	if err != nil {
+		return nil, err
+	}
+
+	if release.Draft {
 		return &CheckResult{
 			CurrentVersion: currentVersion,
 			HasUpdate:      false,
@@ -100,6 +88,68 @@ func CheckForUpdate(ctx context.Context, owner, repo string, includePreRelease b
 		Changelog:      release.Body,
 		DownloadURL:    downloadURL,
 	}, nil
+}
+
+func getLatestStableRelease(ctx context.Context, owner, repo string) (GitHubRelease, error) {
+	url := fmt.Sprintf(githubAPIURL, owner, repo)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return GitHubRelease{}, fmt.Errorf("ошибка создания запроса: %w", err)
+	}
+
+	req.Header.Set("User-Agent", "tracker-cli/"+getCurrentVersion())
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return GitHubRelease{}, fmt.Errorf("ошибка сети: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return GitHubRelease{}, fmt.Errorf("GitHub API вернул статус %d", resp.StatusCode)
+	}
+
+	var release GitHubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return GitHubRelease{}, fmt.Errorf("ошибка парсинга ответа: %w", err)
+	}
+
+	return release, nil
+}
+
+func getLatestReleaseIncludingPreRelease(ctx context.Context, owner, repo string) (GitHubRelease, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases?per_page=1", owner, repo)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return GitHubRelease{}, fmt.Errorf("ошибка создания запроса: %w", err)
+	}
+
+	req.Header.Set("User-Agent", "tracker-cli/"+getCurrentVersion())
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return GitHubRelease{}, fmt.Errorf("ошибка сети: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return GitHubRelease{}, fmt.Errorf("GitHub API вернул статус %d", resp.StatusCode)
+	}
+
+	var releases []GitHubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return GitHubRelease{}, fmt.Errorf("ошибка парсинга ответа: %w", err)
+	}
+
+	if len(releases) == 0 {
+		return GitHubRelease{}, fmt.Errorf("релизы не найдены")
+	}
+
+	return releases[0], nil
 }
 
 func findAssetForPlatform(assets []GitHubAsset) string {
