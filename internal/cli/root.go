@@ -1,13 +1,17 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
 
+	"tracker/internal/cli/task"
 	"tracker/internal/config"
 	"tracker/internal/installer"
 )
+
+var ErrHelp = errors.New("help requested")
 
 var (
 	installFlag   bool
@@ -15,9 +19,11 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "tracker",
-	Short: "Трекер времени задач",
-	Long:  "Трекер времени задач с поддержкой нескольких серверов",
+	Use:           "tracker",
+	Short:         "Трекер времени задач",
+	Long:          "Трекер времени задач с поддержкой нескольких серверов",
+	SilenceErrors: true,
+	SilenceUsage:  true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if isPublicCommand(cmd) {
 			return nil
@@ -46,6 +52,8 @@ func isPublicCommand(cmd *cobra.Command) bool {
 		"tracker": true,
 		"login":   true, "register": true, "configure": true,
 		"server": true, "help": true, "completion": true,
+		"alias": true, "tag": true, "template": true, "config": true,
+		"export": true,
 	}
 
 	if publicCmds[cmd.Name()] {
@@ -84,8 +92,16 @@ func init() {
 	rootCmd.AddCommand(logoutCmd)
 	rootCmd.AddCommand(meCmd)
 	rootCmd.AddCommand(registerCmd)
+
 	rootCmd.AddCommand(configureCmd)
 	rootCmd.AddCommand(serverCmd)
-	rootCmd.AddCommand(taskCmd)
+	rootCmd.AddCommand(configCmd)
+
+	rootCmd.AddCommand(task.Cmd)
 	rootCmd.AddCommand(companyCmd)
+	rootCmd.AddCommand(exportCmd)
+
+	rootCmd.AddCommand(aliasCmd)
+	rootCmd.AddCommand(tagCmd)
+	rootCmd.AddCommand(templateCmd)
 }

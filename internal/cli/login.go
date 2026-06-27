@@ -10,6 +10,7 @@ import (
 
 	"tracker/internal/client"
 	"tracker/internal/config"
+	"tracker/internal/service"
 	"tracker/internal/ui"
 )
 
@@ -142,14 +143,14 @@ var registerCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Print("Имя пользователя: ")
 		username := readLine()
-		if username == "" {
-			return fmt.Errorf("имя пользователя не может быть пустым")
+		if err := service.ValidateUsername(username); err != nil {
+			return err
 		}
 
 		fmt.Print("Email: ")
 		email := readLine()
-		if email == "" {
-			return fmt.Errorf("email не может быть пустым")
+		if err := service.ValidateEmail(email); err != nil {
+			return err
 		}
 
 		fmt.Print("Пароль: ")
@@ -159,7 +160,12 @@ var registerCmd = &cobra.Command{
 		}
 		fmt.Println()
 
-		if err := client.RegisterUser(username, email, string(passwordBytes)); err != nil {
+		password := string(passwordBytes)
+		if err := service.ValidatePassword(password); err != nil {
+			return err
+		}
+
+		if err := client.RegisterUser(username, email, password); err != nil {
 			return err
 		}
 
@@ -190,7 +196,7 @@ func loginPassword() error {
 	resp, err := client.LoginPassword(username, string(passwordBytes))
 	if err != nil {
 		fmt.Println(ui.Cross(), ui.Error("Ошибка авторизации"))
-		return fmt.Errorf("%w", err)
+		return err
 	}
 
 	if err := config.SaveToken(resp.AccessToken); err != nil {
@@ -230,7 +236,7 @@ func loginAD() error {
 	resp, err := client.LoginAD(username, string(passwordBytes))
 	if err != nil {
 		fmt.Println(ui.Cross(), ui.Error("Ошибка AD"))
-		return fmt.Errorf("%w", err)
+		return err
 	}
 
 	if err := config.SaveToken(resp.AccessToken); err != nil {
@@ -253,11 +259,4 @@ func getUserDisplayName() string {
 	config.SaveUserRole(user.Role)
 
 	return user.GetFullName()
-}
-
-func formatUserName(username string, fullName *string) string {
-	if fullName != nil && *fullName != "" && *fullName != username {
-		return fmt.Sprintf("%s (%s)", *fullName, username)
-	}
-	return username
 }

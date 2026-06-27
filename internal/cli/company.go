@@ -8,6 +8,7 @@ import (
 
 	"tracker/internal/client"
 	"tracker/internal/config"
+	"tracker/internal/service"
 	"tracker/internal/ui"
 	"tracker/pkg/table"
 )
@@ -44,7 +45,7 @@ var companyListCmd = &cobra.Command{
 			offset = 0
 		} else {
 			if !cmd.Flags().Changed("limit") {
-				limit = defaultPageSize
+				limit = service.DefaultPageSize
 			}
 			if cmd.Flags().Changed("page") && page > 1 {
 				offset = (page - 1) * limit
@@ -124,6 +125,13 @@ var companyAddCmd = &cobra.Command{
 		name := strings.ToUpper(args[0])
 		description, _ := cmd.Flags().GetString("description")
 
+		if err := service.ValidateCompanyName(name); err != nil {
+			return err
+		}
+		if err := service.ValidateCompanyDescription(description); err != nil {
+			return err
+		}
+
 		company, err := client.CreateCompany(name, description)
 		if err != nil {
 			return err
@@ -159,7 +167,7 @@ func init() {
 
 	companyListCmd.Flags().Bool("all", false, "Показать все компании (без пагинации)")
 	companyListCmd.Flags().Int("page", 1, "Номер страницы")
-	companyListCmd.Flags().Int("limit", defaultPageSize, "Количество компаний на странице")
+	companyListCmd.Flags().Int("limit", service.DefaultPageSize, "Количество компаний на странице")
 	companyListCmd.Flags().Int("offset", 0, "Смещение от начала")
 
 	companyCmd.AddCommand(companyListCmd)

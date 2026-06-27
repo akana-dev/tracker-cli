@@ -8,6 +8,48 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type colorSet struct {
+	cyan    func(...interface{}) string
+	green   func(...interface{}) string
+	yellow  func(...interface{}) string
+	dim     func(...interface{}) string
+	bold    func(...interface{}) string
+	red     func(...interface{}) string
+	magenta func(...interface{}) string
+}
+
+func newColorSet() *colorSet {
+	return &colorSet{
+		cyan:    color.New(color.FgCyan, color.Bold).SprintFunc(),
+		green:   color.New(color.FgGreen).SprintFunc(),
+		yellow:  color.New(color.FgYellow).SprintFunc(),
+		dim:     color.New(color.Faint).SprintFunc(),
+		bold:    color.New(color.Bold).SprintFunc(),
+		red:     color.New(color.FgRed, color.Bold).SprintFunc(),
+		magenta: color.New(color.FgMagenta).SprintFunc(),
+	}
+}
+
+type commandGroup struct {
+	title string
+	names []string
+}
+
+var groupsConfig = map[string][]commandGroup{
+	"tracker": {
+		{"Авторизация:", []string{"login", "logout", "me", "register"}},
+		{"Конфигурация:", []string{"configure", "server"}},
+		{"Работа с данными:", []string{"task", "company"}},
+		{"Администрирование:", []string{"users", "role"}},
+	},
+	"task": {
+		{"Создание:", []string{"add"}},
+		{"Просмотр:", []string{"list", "view", "export"}},
+		{"Редактирование:", []string{"edit", "assign", "close"}},
+		{"Управление состоянием:", []string{"pause", "resume", "delete"}},
+	},
+}
+
 func SetupHelp(cmd *cobra.Command) {
 	cmd.SetHelpFunc(func(c *cobra.Command, args []string) {
 		printHelp(c)
@@ -15,249 +57,128 @@ func SetupHelp(cmd *cobra.Command) {
 }
 
 func printHelp(cmd *cobra.Command) {
-	cyan := color.New(color.FgCyan, color.Bold).SprintFunc()
-	green := color.New(color.FgGreen).SprintFunc()
-	yellow := color.New(color.FgYellow).SprintFunc()
-	dim := color.New(color.Faint).SprintFunc()
-	bold := color.New(color.Bold).SprintFunc()
-	red := color.New(color.FgRed, color.Bold).SprintFunc()
-	magenta := color.New(color.FgMagenta).SprintFunc()
+	colors := newColorSet()
 
 	fmt.Println()
 
 	if cmd.Long != "" {
-		fmt.Println(bold(cmd.Long))
+		fmt.Println(colors.bold(cmd.Long))
 	} else if cmd.Short != "" {
-		fmt.Println(bold(cmd.Short))
+		fmt.Println(colors.bold(cmd.Short))
 	}
 	fmt.Println()
 
-	fmt.Printf("%s %s\n", green("Использование:"), cyan(cmd.Use))
+	fmt.Printf("%s %s\n", colors.green("Использование:"), colors.cyan(cmd.Use))
 	fmt.Println()
 
 	if cmd.HasAvailableSubCommands() {
-		cmds := cmd.Commands()
-
-		switch cmd.Name() {
-		case "tracker":
-			printRootHelp(cmds, bold, cyan, green, yellow, red, magenta, dim)
-		case "task":
-			printTaskHelp(cmds, bold, cyan, green, yellow, dim)
-		case "company":
-			printCompanyHelp(cmds, bold, cyan, dim)
-		case "server":
-			printServerHelp(cmds, bold, cyan, dim)
-		default:
-			printDefaultHelp(cmds, bold, cyan, dim)
-		}
+		printCommands(cmd, colors)
 	}
 
 	if cmd.HasAvailableFlags() {
-		fmt.Println(bold("Флаги:"))
+		fmt.Println(colors.bold("Флаги:"))
 		fmt.Print(cmd.Flags().FlagUsages())
 		fmt.Println()
 	}
 
 	if cmd.HasAvailableInheritedFlags() && cmd != cmd.Root() {
-		fmt.Println(bold("Глобальные флаги:"))
+		fmt.Println(colors.bold("Глобальные флаги:"))
 		fmt.Print(cmd.InheritedFlags().FlagUsages())
 		fmt.Println()
 	}
 
 	fmt.Printf("%s '%s' для подробной информации о команде.\n",
-		dim("Используйте"),
-		cyan(fmt.Sprintf("%s [command] --help", cmd.CommandPath())),
+		colors.dim("Используйте"),
+		colors.cyan(fmt.Sprintf("%s [command] --help", cmd.CommandPath())),
 	)
 	fmt.Println()
 }
 
-func printRootHelp(cmds []*cobra.Command, bold, cyan, green, yellow, red, magenta, dim func(...interface{}) string) {
-	authCmds := []string{"login", "logout", "me", "register"}
-	configCmds := []string{"configure", "server"}
-	workCmds := []string{"task", "company"}
-	adminCmds := []string{"users", "role"}
+func printCommands(cmd *cobra.Command, colors *colorSet) {
+	cmds := cmd.Commands()
 
-	printCmdGroup := func(title string, names []string, titleColor func(...interface{}) string) {
-		var filtered []*cobra.Command
-		for _, c := range cmds {
-			for _, name := range names {
-				if c.Name() == name && !c.Hidden {
-					filtered = append(filtered, c)
-					break
-				}
-			}
-		}
-		if len(filtered) == 0 {
-			return
-		}
-
-		fmt.Printf("  %s\n", titleColor(title))
-		maxLen := 0
-		for _, c := range filtered {
-			if len(c.Name()) > maxLen {
-				maxLen = len(c.Name())
-			}
-		}
-		for _, c := range filtered {
-			padding := strings.Repeat(" ", maxLen-len(c.Name())+4)
-			fmt.Printf("    %s%s%s\n", cyan(c.Name()), padding, c.Short)
-		}
-		fmt.Println()
-	}
-
-	fmt.Println(bold("Команды:"))
-	printCmdGroup("Авторизация:", authCmds, yellow)
-	printCmdGroup("Конфигурация:", configCmds, yellow)
-	printCmdGroup("Работа с данными:", workCmds, yellow)
-	printCmdGroup("Администрирование:", adminCmds, yellow)
-
-	var other []*cobra.Command
-	knownNames := append(append(append(authCmds, configCmds...), workCmds...), adminCmds...)
-	for _, c := range cmds {
-		isKnown := false
-		for _, name := range knownNames {
-			if c.Name() == name {
-				isKnown = true
-				break
-			}
-		}
-		if !isKnown && !c.Hidden {
-			other = append(other, c)
-		}
-	}
-	if len(other) > 0 {
-		fmt.Printf("  %s\n", dim("Другие команды:"))
-		maxLen := 0
-		for _, oc := range other {
-			if len(oc.Name()) > maxLen {
-				maxLen = len(oc.Name())
-			}
-		}
-		for _, c := range other {
-			padding := strings.Repeat(" ", maxLen-len(c.Name())+4)
-			fmt.Printf("    %s%s%s\n", cyan(c.Name()), padding, c.Short)
-		}
-		fmt.Println()
+	if groups, ok := groupsConfig[cmd.Name()]; ok {
+		printGroupedCommands(cmds, groups, colors)
+	} else {
+		printSimpleCommands(cmds, colors)
 	}
 }
 
-func printTaskHelp(cmds []*cobra.Command, bold, cyan, green, yellow, dim func(...interface{}) string) {
-	createCmds := []string{"add"}
-	viewCmds := []string{"list", "view", "export"}
-	editCmds := []string{"edit", "assign", "close"}
-	lifecycleCmds := []string{"pause", "resume", "delete"}
+func printGroupedCommands(cmds []*cobra.Command, groups []commandGroup, colors *colorSet) {
+	fmt.Println(colors.bold("Команды:"))
 
-	printCmdGroup := func(title string, names []string, titleColor func(...interface{}) string) {
-		var filtered []*cobra.Command
-		for _, c := range cmds {
-			for _, name := range names {
-				if c.Name() == name && !c.Hidden {
-					filtered = append(filtered, c)
-					break
-				}
-			}
+	knownNames := make(map[string]bool)
+	for _, g := range groups {
+		for _, name := range g.names {
+			knownNames[name] = true
 		}
+	}
+
+	for _, group := range groups {
+		filtered := filterCommands(cmds, group.names)
 		if len(filtered) == 0 {
-			return
-		}
-
-		fmt.Printf("  %s\n", titleColor(title))
-		maxLen := 0
-		for _, c := range filtered {
-			if len(c.Name()) > maxLen {
-				maxLen = len(c.Name())
-			}
-		}
-		for _, c := range filtered {
-			padding := strings.Repeat(" ", maxLen-len(c.Name())+4)
-			fmt.Printf("    %s%s%s\n", cyan(c.Name()), padding, c.Short)
-		}
-		fmt.Println()
-	}
-
-	fmt.Println(bold("Команды:"))
-	printCmdGroup("Создание:", createCmds, yellow)
-	printCmdGroup("Просмотр:", viewCmds, yellow)
-	printCmdGroup("Редактирование:", editCmds, yellow)
-	printCmdGroup("Управление состоянием:", lifecycleCmds, yellow)
-
-	// Остальные
-	var other []*cobra.Command
-	knownNames := append(append(append(createCmds, viewCmds...), editCmds...), lifecycleCmds...)
-	for _, c := range cmds {
-		isKnown := false
-		for _, name := range knownNames {
-			if c.Name() == name {
-				isKnown = true
-				break
-			}
-		}
-		if !isKnown && !c.Hidden {
-			other = append(other, c)
-		}
-	}
-	if len(other) > 0 {
-		fmt.Printf("  %s\n", dim("Другие команды:"))
-		for _, c := range other {
-			fmt.Printf("    %s    %s\n", cyan(c.Name()), c.Short)
-		}
-		fmt.Println()
-	}
-}
-
-func printCompanyHelp(cmds []*cobra.Command, bold, cyan, dim func(...interface{}) string) {
-	fmt.Println(bold("Команды:"))
-	maxLen := 0
-	for _, c := range cmds {
-		if !c.Hidden && len(c.Name()) > maxLen {
-			maxLen = len(c.Name())
-		}
-	}
-	for _, c := range cmds {
-		if c.Hidden {
 			continue
 		}
-		padding := strings.Repeat(" ", maxLen-len(c.Name())+4)
-		fmt.Printf("  %s%s%s\n", cyan(c.Name()), padding, c.Short)
+		printCommandGroup(group.title, filtered, colors.yellow, colors.cyan)
 	}
-	fmt.Println()
-}
 
-func printServerHelp(cmds []*cobra.Command, bold, cyan, dim func(...interface{}) string) {
-	fmt.Println(bold("Команды:"))
-	maxLen := 0
+	var others []*cobra.Command
 	for _, c := range cmds {
-		if !c.Hidden && len(c.Name()) > maxLen {
-			maxLen = len(c.Name())
+		if !c.Hidden && !knownNames[c.Name()] {
+			others = append(others, c)
 		}
 	}
-	for _, c := range cmds {
-		if c.Hidden {
-			continue
-		}
-		padding := strings.Repeat(" ", maxLen-len(c.Name())+4)
-		fmt.Printf("  %s%s%s\n", cyan(c.Name()), padding, c.Short)
+	if len(others) > 0 {
+		printCommandGroup("Другие команды:", others, colors.dim, colors.cyan)
 	}
-	fmt.Println()
 }
 
-func printDefaultHelp(cmds []*cobra.Command, bold, cyan, dim func(...interface{}) string) {
-	if len(cmds) == 0 {
+func printSimpleCommands(cmds []*cobra.Command, colors *colorSet) {
+	var visible []*cobra.Command
+	for _, c := range cmds {
+		if !c.Hidden {
+			visible = append(visible, c)
+		}
+	}
+	if len(visible) == 0 {
 		return
 	}
-	fmt.Println(bold("Команды:"))
+
+	fmt.Println(colors.bold("Команды:"))
+	printCommandList(visible, colors.cyan)
+}
+
+func printCommandGroup(title string, cmds []*cobra.Command, titleColor, cmdColor func(...interface{}) string) {
+	fmt.Printf("  %s\n", titleColor(title))
+	printCommandList(cmds, cmdColor)
+}
+
+func printCommandList(cmds []*cobra.Command, cmdColor func(...interface{}) string) {
 	maxLen := 0
 	for _, c := range cmds {
-		if !c.Hidden && len(c.Name()) > maxLen {
+		if len(c.Name()) > maxLen {
 			maxLen = len(c.Name())
 		}
 	}
+
 	for _, c := range cmds {
-		if c.Hidden {
-			continue
-		}
 		padding := strings.Repeat(" ", maxLen-len(c.Name())+4)
-		fmt.Printf("  %s%s%s\n", cyan(c.Name()), padding, c.Short)
+		fmt.Printf("    %s%s%s\n", cmdColor(c.Name()), padding, c.Short)
 	}
 	fmt.Println()
+}
+
+func filterCommands(cmds []*cobra.Command, names []string) []*cobra.Command {
+	nameSet := make(map[string]bool, len(names))
+	for _, n := range names {
+		nameSet[n] = true
+	}
+
+	var filtered []*cobra.Command
+	for _, c := range cmds {
+		if nameSet[c.Name()] && !c.Hidden {
+			filtered = append(filtered, c)
+		}
+	}
+	return filtered
 }

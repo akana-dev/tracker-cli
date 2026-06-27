@@ -46,6 +46,7 @@ type Task struct {
 	Sessions           []TaskSession `json:"sessions"`
 	CanEdit            bool          `json:"can_edit"`
 	CanDelete          bool          `json:"can_delete"`
+	Comments           []Comment     `json:"comments,omitempty"`
 }
 
 func (t *Task) GetAssigneeDisplay() string {
@@ -194,4 +195,54 @@ func (r *CompanyListResponse) HasNext() bool {
 
 func (r *CompanyListResponse) HasPrev() bool {
 	return r.Offset > 0
+}
+
+type Template struct {
+	// Name — имя шаблона (используется как идентификатор, не хранится в YAML)
+	Name string `yaml:"-" json:"name"`
+
+	// Title — название задачи (обязательное поле)
+	Title string `yaml:"title" json:"title"`
+
+	// Company — название компании (опционально)
+	Company string `yaml:"company,omitempty" json:"company,omitempty"`
+
+	// Assignee — исполнитель (опционально)
+	Assignee string `yaml:"assignee,omitempty" json:"assignee,omitempty"`
+
+	// Solution — статус решения по умолчанию (опционально)
+	Solution string `yaml:"solution,omitempty" json:"solution,omitempty"`
+
+	// Comment — комментарий по умолчанию (опционально)
+	Comment string `yaml:"comment,omitempty" json:"comment,omitempty"`
+
+	// Tags — список тегов (опционально)
+	Tags []string `yaml:"tags,omitempty" json:"tags,omitempty"`
+}
+
+type Comment struct {
+	ID               int           `json:"id"`
+	TaskID           int           `json:"task_id"`
+	Content          string        `json:"content"`
+	ContentHTML      string        `json:"content_html"`
+	User             CommentUser   `json:"user"`
+	MentionedUserIDs []int         `json:"mentioned_user_ids"`
+	CreatedAt        FlexibleTime  `json:"created_at"`
+	UpdatedAt        *FlexibleTime `json:"updated_at,omitempty"`
+	IsEdited         bool          `json:"is_edited"`
+	CanEdit          bool          `json:"can_edit"`
+	CanDelete        bool          `json:"can_delete"`
+}
+
+type CommentUser struct {
+	ID       int     `json:"id"`
+	Username string  `json:"username"`
+	FullName *string `json:"full_name,omitempty"`
+}
+
+func (u *CommentUser) GetDisplayName() string {
+	if u.FullName != nil && *u.FullName != "" {
+		return fmt.Sprintf("%s (%s)", *u.FullName, u.Username)
+	}
+	return u.Username
 }

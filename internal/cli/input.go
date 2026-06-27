@@ -1,31 +1,13 @@
 package cli
 
 import (
-	"bufio"
-	"fmt"
-	"os"
-	"strings"
+	"tracker/internal/input"
 )
 
 func readLine() string {
-	reader := bufio.NewReader(os.Stdin)
-	input, err := reader.ReadString('\n')
-	if err != nil {
-		return ""
-	}
-	input = strings.TrimRight(input, "\r\n")
-	return strings.TrimSpace(input)
+	return input.ReadLine()
 }
 
 func readLineWithDefault(prompt, defaultValue string) string {
-	if defaultValue != "" {
-		fmt.Printf("%s [%s]: ", prompt, defaultValue)
-	} else {
-		fmt.Printf("%s: ", prompt)
-	}
-	input := readLine()
-	if input == "" {
-		return defaultValue
-	}
-	return input
+	return input.ReadLineWithDefault(prompt, defaultValue)
 }

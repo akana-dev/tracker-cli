@@ -2,6 +2,7 @@ package installer
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -89,15 +90,10 @@ func installUnix(execPath string) error {
 
 	if err := copyFile(execPath, targetPath); err != nil {
 		fmt.Println(ui.Warning("Требуется sudo для установки в /usr/local/bin"))
-		cmd := exec.Command("sudo", "cp", execPath, targetPath)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
+		if err := runSudo("cp", execPath, targetPath); err != nil {
 			return fmt.Errorf("не удалось скопировать бинарник: %w", err)
 		}
-
-		cmd = exec.Command("sudo", "chmod", "+x", targetPath)
-		if err := cmd.Run(); err != nil {
+		if err := runSudo("chmod", "+x", targetPath); err != nil {
 			return fmt.Errorf("не удалось сделать бинарник исполняемым: %w", err)
 		}
 	} else {
@@ -150,10 +146,7 @@ func uninstallUnix() error {
 		return nil
 	}
 
-	cmd := exec.Command("sudo", "rm", targetPath)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	if err := runSudo("rm", targetPath); err != nil {
 		return fmt.Errorf("не удалось удалить: %w", err)
 	}
 
@@ -174,23 +167,18 @@ func copyFile(src, dst string) error {
 	}
 	defer destFile.Close()
 
-	buf := make([]byte, 1024*1024) // 1 MB buffer
-	for {
-		n, err := sourceFile.Read(buf)
-		if n > 0 {
-			if _, writeErr := destFile.Write(buf[:n]); writeErr != nil {
-				return writeErr
-			}
-		}
-		if err != nil {
-			if err.Error() == "EOF" {
-				break
-			}
-			return err
-		}
+	if _, err := io.Copy(destFile, sourceFile); err != nil {
+		return err
 	}
 
-	return nil
+	return destFile.Sync()
+}
+
+func runSudo(args ...string) error {
+	cmd := exec.Command("sudo", args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 func isInWindowsPath(dir string) bool {

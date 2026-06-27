@@ -49,14 +49,14 @@ func FormatSessions(t models.Task) string {
 				lines = append(lines, ui.Paused(
 					fmt.Sprintf("%s - на паузе (%.1fч)", startStr, pauseDuration)))
 			} else {
-				hoursWorking := time.Now().Sub(startLocal).Hours()
+				hoursWorking := time.Since(startLocal).Hours()
 				if hoursWorking < 0 {
 					hoursWorking = 0
 				}
-				if hoursWorking > 8 {
+				if hoursWorking > ErrorHoursWorked {
 					lines = append(lines, ui.Error(
 						fmt.Sprintf("%s - в работе %.1fч", startStr, hoursWorking)))
-				} else if hoursWorking > 4 {
+				} else if hoursWorking > WarningHoursWorked {
 					lines = append(lines, ui.Warning(
 						fmt.Sprintf("%s - в работе %.1fч", startStr, hoursWorking)))
 				} else {
@@ -102,7 +102,7 @@ func FormatTaskCell(t models.Task) string {
 func PrintIndented(text, indent string) {
 	lines := strings.Split(text, "\n")
 	for _, line := range lines {
-		wrappedLines := WrapText(line, 70)
+		wrappedLines := WrapText(line, WrapWidth)
 		for _, wl := range wrappedLines {
 			fmt.Println(indent + wl)
 		}

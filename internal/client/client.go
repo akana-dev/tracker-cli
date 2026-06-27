@@ -15,16 +15,10 @@ import (
 
 	"tracker/internal/config"
 	"tracker/internal/models"
+	"tracker/internal/service"
 )
 
-const (
-	httpTimeout    = 30 * time.Second
-	maxRetries     = 3
-	initialBackoff = 100 * time.Millisecond
-	maxBackoff     = 2 * time.Second
-)
-
-var httpClient = &http.Client{Timeout: httpTimeout}
+var httpClient = &http.Client{Timeout: service.HTTPTimeout}
 
 func isRetryableError(err error, statusCode int) bool {
 	if err != nil {
@@ -71,9 +65,9 @@ func doRequestWithCtx(ctx context.Context, method, path string, body interface{}
 	}
 
 	var lastErr error
-	backoff := initialBackoff
+	backoff := service.InitialBackoff
 
-	for attempt := 0; attempt <= maxRetries; attempt++ {
+	for attempt := 0; attempt <= service.MaxRetries; attempt++ {
 		if attempt > 0 {
 			select {
 			case <-ctx.Done():
@@ -81,8 +75,8 @@ func doRequestWithCtx(ctx context.Context, method, path string, body interface{}
 			case <-time.After(backoff):
 			}
 			backoff *= 2
-			if backoff > maxBackoff {
-				backoff = maxBackoff
+			if backoff > service.MaxBackoff {
+				backoff = service.MaxBackoff
 			}
 		}
 
@@ -108,7 +102,7 @@ func doRequestWithCtx(ctx context.Context, method, path string, body interface{}
 		resp, err := httpClient.Do(req)
 		if err != nil {
 			lastErr = fmt.Errorf("ошибка сети: %w", err)
-			if isRetryableError(err, 0) && attempt < maxRetries {
+			if isRetryableError(err, 0) && attempt < service.MaxRetries {
 				continue
 			}
 			return lastErr
@@ -127,7 +121,7 @@ func doRequestWithCtx(ctx context.Context, method, path string, body interface{}
 			bodyBytesResp, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
 
-			if isRetryableError(nil, resp.StatusCode) && attempt < maxRetries {
+			if isRetryableError(nil, resp.StatusCode) && attempt < service.MaxRetries {
 				lastErr = fmt.Errorf("ошибка %d: %s", resp.StatusCode, string(bodyBytesResp))
 				continue
 			}
@@ -172,9 +166,9 @@ func doRawRequestWithCtx(ctx context.Context, method, path string, body interfac
 	}
 
 	var lastErr error
-	backoff := initialBackoff
+	backoff := service.InitialBackoff
 
-	for attempt := 0; attempt <= maxRetries; attempt++ {
+	for attempt := 0; attempt <= service.MaxRetries; attempt++ {
 		if attempt > 0 {
 			select {
 			case <-ctx.Done():
@@ -182,8 +176,8 @@ func doRawRequestWithCtx(ctx context.Context, method, path string, body interfac
 			case <-time.After(backoff):
 			}
 			backoff *= 2
-			if backoff > maxBackoff {
-				backoff = maxBackoff
+			if backoff > service.MaxBackoff {
+				backoff = service.MaxBackoff
 			}
 		}
 
@@ -209,7 +203,7 @@ func doRawRequestWithCtx(ctx context.Context, method, path string, body interfac
 		resp, err := httpClient.Do(req)
 		if err != nil {
 			lastErr = fmt.Errorf("ошибка сети: %w", err)
-			if isRetryableError(err, 0) && attempt < maxRetries {
+			if isRetryableError(err, 0) && attempt < service.MaxRetries {
 				continue
 			}
 			return nil, nil, lastErr
@@ -228,7 +222,7 @@ func doRawRequestWithCtx(ctx context.Context, method, path string, body interfac
 			bodyBytesResp, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
 
-			if isRetryableError(nil, resp.StatusCode) && attempt < maxRetries {
+			if isRetryableError(nil, resp.StatusCode) && attempt < service.MaxRetries {
 				lastErr = fmt.Errorf("ошибка %d: %s", resp.StatusCode, string(bodyBytesResp))
 				continue
 			}
@@ -264,7 +258,7 @@ func LoginPassword(username, password string) (*models.TokenResponse, error) {
 	data.Set("username", username)
 	data.Set("password", password)
 
-	ctx, cancel := context.WithTimeout(context.Background(), httpTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), service.HTTPTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "POST", apiURL+"/auth/login", strings.NewReader(data.Encode()))
@@ -345,8 +339,9 @@ func GetTaskByTicket(ticket string) (*models.Task, error) {
 		return nil, fmt.Errorf("тикет %s не найден", ticket)
 	}
 
-	return &resp.Tasks[0], nil
+	return GetTaskWithComments(resp.Tasks[0].ID)
 }
+
 func ListTasks(params map[string]string, limit, offset int) (*models.TaskListResponse, error) {
 	values := url.Values{}
 	for k, v := range params {
@@ -380,7 +375,8 @@ func ListTasks(params map[string]string, limit, offset int) (*models.TaskListRes
 
 	var resp models.TaskListResponse
 
-	if trimmed[0] == '[' {
+	switch trimmed[0] {
+	case '[':
 		var tasks []models.Task
 		if err := json.Unmarshal(data, &tasks); err != nil {
 			return nil, fmt.Errorf("ошибка парсинга массива задач: %w", err)
@@ -389,7 +385,7 @@ func ListTasks(params map[string]string, limit, offset int) (*models.TaskListRes
 		resp.Total = len(tasks)
 		resp.Limit = limit
 		resp.Offset = offset
-	} else if trimmed[0] == '{' {
+	case '{':
 		if err := json.Unmarshal(data, &resp); err != nil {
 			return nil, fmt.Errorf("ошибка парсинга структуры задач: %w", err)
 		}
@@ -402,7 +398,7 @@ func ListTasks(params map[string]string, limit, offset int) (*models.TaskListRes
 		if resp.Offset == 0 && offset > 0 {
 			resp.Offset = offset
 		}
-	} else {
+	default:
 		return nil, fmt.Errorf("неожиданный формат ответа сервера")
 	}
 
@@ -446,12 +442,15 @@ func GetTaskSummary(params map[string]string) (*models.TaskSummary, error) {
 	return &resp, err
 }
 
-func ExportTasks(format string, params map[string]string) ([]byte, string, error) {
+func ExportTasks(params map[string]string) ([]byte, string, error) {
 	values := url.Values{}
-	values.Set("format", format)
+
 	for k, v := range params {
-		values.Set(k, v)
+		if v != "" {
+			values.Set(k, v)
+		}
 	}
+
 	path := "/tasks/export?" + values.Encode()
 
 	data, headers, err := doRawRequest("GET", path, nil)
@@ -459,7 +458,7 @@ func ExportTasks(format string, params map[string]string) ([]byte, string, error
 		return nil, "", err
 	}
 
-	filename := fmt.Sprintf("tasks.%s", format)
+	filename := "tasks.csv"
 	if contentDisp := headers.Get("Content-Disposition"); strings.Contains(contentDisp, "filename=") {
 		parts := strings.Split(contentDisp, "filename=")
 		if len(parts) > 1 {
@@ -548,4 +547,54 @@ func ListUsers() ([]models.User, error) {
 func UpdateUserRole(username, role string) error {
 	payload := map[string]string{"role": role}
 	return doRequest("PUT", fmt.Sprintf("/auth/users/%s/role", url.PathEscape(username)), payload, nil)
+}
+
+func ListComments(taskID int, limit, offset int) ([]models.Comment, error) {
+	path := fmt.Sprintf("/tasks/%d/comments", taskID)
+
+	values := url.Values{}
+	if limit > 0 {
+		values.Set("limit", fmt.Sprintf("%d", limit))
+	}
+	if offset > 0 {
+		values.Set("offset", fmt.Sprintf("%d", offset))
+	}
+
+	if len(values) > 0 {
+		path += "?" + values.Encode()
+	}
+
+	var resp []models.Comment
+	err := doRequest("GET", path, nil, &resp)
+	return resp, err
+}
+
+func CreateComment(taskID int, content string) (*models.Comment, error) {
+	payload := map[string]string{
+		"content": content,
+	}
+
+	var resp models.Comment
+	err := doRequest("POST", fmt.Sprintf("/tasks/%d/comments", taskID), payload, &resp)
+	return &resp, err
+}
+
+func UpdateComment(taskID, commentID int, content string) (*models.Comment, error) {
+	payload := map[string]string{
+		"content": content,
+	}
+
+	var resp models.Comment
+	err := doRequest("PUT", fmt.Sprintf("/tasks/%d/comments/%d", taskID, commentID), payload, &resp)
+	return &resp, err
+}
+
+func DeleteComment(taskID, commentID int) error {
+	return doRequest("DELETE", fmt.Sprintf("/tasks/%d/comments/%d", taskID, commentID), nil, nil)
+}
+
+func GetTaskWithComments(taskID int) (*models.Task, error) {
+	var resp models.Task
+	err := doRequest("GET", fmt.Sprintf("/tasks/%d", taskID), nil, &resp)
+	return &resp, err
 }
