@@ -90,6 +90,6 @@ func init() {
 	AddCmd.Flags().StringP("end", "e", "", "Конец")
 	AddCmd.Flags().StringP("company", "q", "", "Компания (по умолчанию — из конфига)")
 	AddCmd.Flags().StringP("assignee", "a", "", "Исполнитель")
-	AddCmd.Flags().String("solution", "", "Статус")
+	AddCmd.Flags().StringP("solution", "S", "", "Статус")
 	AddCmd.Flags().StringP("comment", "C", "", "Комментарий")
 }

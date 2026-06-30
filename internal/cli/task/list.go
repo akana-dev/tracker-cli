@@ -173,13 +173,13 @@ func init() {
 	ListCmd.Flags().BoolP("week", "w", false, "За неделю")
 	ListCmd.Flags().BoolP("month", "m", false, "За месяц")
 	ListCmd.Flags().StringP("company", "q", "", "Фильтр по компании")
-	ListCmd.Flags().String("solution", "", "Фильтр по статусу")
+	ListCmd.Flags().StringP("solution", "S", "", "Фильтр по статусу")
 	ListCmd.Flags().StringP("assignee", "a", "", "Фильтр по исполнителю")
 	ListCmd.Flags().StringP("search", "s", "", "Поиск")
 	ListCmd.Flags().StringSlice("tag", nil, "Фильтр по тегам")
 
-	ListCmd.Flags().Bool("all", false, "Показать все задачи")
-	ListCmd.Flags().Int("page", 1, "Номер страницы")
-	ListCmd.Flags().Int("limit", service.DefaultPageSize, "Количество задач на странице")
-	ListCmd.Flags().Int("offset", 0, "Смещение от начала")
+	ListCmd.Flags().BoolP("all", "A", false, "Показать все задачи")
+	ListCmd.Flags().IntP("page", "p", 1, "Номер страницы")
+	ListCmd.Flags().IntP("limit", "l", service.DefaultPageSize, "Количество задач на странице")
+	ListCmd.Flags().IntP("offset", "o", 0, "Смещение от начала")
 }

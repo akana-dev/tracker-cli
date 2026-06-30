@@ -19,23 +19,24 @@ var loginCmd = &cobra.Command{
 	Short: "Вход в систему",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		method, _ := cmd.Flags().GetString("method")
+		username, _ := cmd.Flags().GetString("username")
 
 		if method == "" || method == "password" && !cmd.Flags().Changed("method") {
-			return loginAuto()
+			return loginAuto(username)
 		}
 
 		switch method {
 		case "ad":
-			return loginAD()
+			return loginAD(username)
 		case "password":
-			return loginPassword()
+			return loginPassword(username)
 		default:
 			return fmt.Errorf("неизвестный метод: %s (допустимы: password, ad)", method)
 		}
 	},
 }
 
-func loginAuto() error {
+func loginAuto(username string) error {
 	server, err := config.GetCurrentServer()
 	if err != nil {
 		return err
@@ -51,9 +52,9 @@ func loginAuto() error {
 		fmt.Println(ui.Dimf("Используется метод: %s", method))
 		switch method {
 		case "ad":
-			return loginAD()
+			return loginAD(username)
 		case "password":
-			return loginPassword()
+			return loginPassword(username)
 		default:
 			return fmt.Errorf("неизвестный метод в конфиге: %s", method)
 		}
@@ -69,9 +70,9 @@ func loginAuto() error {
 
 		switch method {
 		case "ad":
-			err = loginAD()
+			err = loginAD(username)
 		case "password":
-			err = loginPassword()
+			err = loginPassword(username)
 		default:
 			fmt.Println(ui.Warningf("Неизвестный метод: %s, пропускаем", method))
 			continue
@@ -177,13 +178,17 @@ var registerCmd = &cobra.Command{
 
 func init() {
 	loginCmd.Flags().StringP("method", "m", "", "Метод авторизации: password, ad (по умолчанию — из конфига)")
+	loginCmd.Flags().StringP("username", "u", "", "Имя пользователя (пропустить ввод)")
 }
 
-func loginPassword() error {
+func loginPassword(username string) error {
 	fmt.Print("Логин трекера: ")
-	username := readLine()
 	if username == "" {
-		return fmt.Errorf("логин не может быть пустым")
+		fmt.Print("Логин трекера: ")
+		username = readLine()
+		if username == "" {
+			return fmt.Errorf("логин не может быть пустым")
+		}
 	}
 
 	fmt.Print("Пароль: ")
@@ -210,16 +215,18 @@ func loginPassword() error {
 	return nil
 }
 
-func loginAD() error {
+func loginAD(username string) error {
 	domain := config.GetADDomain()
 	if domain == "" {
 		return fmt.Errorf("не настроен AD домен. Выполните: tracker configure")
 	}
 
-	fmt.Printf("Логин AD (user@%s): ", domain)
-	username := readLine()
 	if username == "" {
-		return fmt.Errorf("логин не может быть пустым")
+		fmt.Printf("Логин AD (user): ")
+		username = readLine()
+		if username == "" {
+			return fmt.Errorf("логин не может быть пустым")
+		}
 	}
 
 	if !strings.Contains(username, "@") && !strings.Contains(username, "\\") {

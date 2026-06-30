@@ -94,8 +94,8 @@ var ListCmd = &cobra.Command{
 }
 
 func init() {
-	ListCmd.Flags().Bool("all", false, "Показать все комментарии (без пагинации)")
-	ListCmd.Flags().Int("page", 1, "Номер страницы")
-	ListCmd.Flags().Int("limit", service.DefaultPageSize, "Количество комментариев на странице")
-	ListCmd.Flags().Int("offset", 0, "Смещение от начала")
+	ListCmd.Flags().BoolP("all", "a", false, "Показать все комментарии (без пагинации)")
+	ListCmd.Flags().IntP("page", "p", 1, "Номер страницы")
+	ListCmd.Flags().IntP("limit", "l", service.DefaultPageSize, "Количество комментариев на странице")
+	ListCmd.Flags().IntP("offset", "o", 0, "Смещение от начала")
 }

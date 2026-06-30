@@ -93,7 +93,7 @@ var configShowCmd = &cobra.Command{
 }
 
 func init() {
-	configDefaultCompanyCmd.Flags().Bool("clear", false, "Сбросить компанию по умолчанию")
+	configDefaultCompanyCmd.Flags().BoolP("clear", "c", false, "Сбросить компанию по умолчанию")
 
 	configCmd.AddCommand(configDefaultCompanyCmd)
 	configCmd.AddCommand(configShowCmd)

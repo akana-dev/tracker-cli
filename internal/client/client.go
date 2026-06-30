@@ -415,15 +415,15 @@ func DeleteTask(taskID int) error {
 	return doRequest("DELETE", fmt.Sprintf("/tasks/%d", taskID), nil, nil)
 }
 
-func PauseTask(taskID int) (*models.Task, error) {
+func PauseTask(taskID int, payload map[string]interface{}) (*models.Task, error) {
 	var resp models.Task
-	err := doRequest("POST", fmt.Sprintf("/tasks/%d/pause", taskID), nil, &resp)
+	err := doRequest("POST", fmt.Sprintf("/tasks/%d/pause", taskID), payload, &resp)
 	return &resp, err
 }
 
-func ResumeTask(taskID int) (*models.Task, error) {
+func ResumeTask(taskID int, payload map[string]interface{}) (*models.Task, error) {
 	var resp models.Task
-	err := doRequest("POST", fmt.Sprintf("/tasks/%d/resume", taskID), nil, &resp)
+	err := doRequest("POST", fmt.Sprintf("/tasks/%d/resume", taskID), payload, &resp)
 	return &resp, err
 }
 

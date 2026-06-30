@@ -139,7 +139,7 @@ func init() {
 	FromCmd.Flags().StringP("end", "e", "", "Конец")
 	FromCmd.Flags().StringP("company", "q", "", "Переопределить компанию")
 	FromCmd.Flags().StringP("assignee", "a", "", "Переопределить исполнителя")
-	FromCmd.Flags().String("solution", "", "Переопределить статус")
+	FromCmd.Flags().StringP("solution", "S", "", "Переопределить статус")
 	FromCmd.Flags().StringP("comment", "C", "", "Переопределить комментарий")
 	FromCmd.Flags().StringSlice("tag", nil, "Дополнительные теги")
 }

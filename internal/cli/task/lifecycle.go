@@ -3,12 +3,14 @@ package task
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"tracker/internal/client"
 	"tracker/internal/service"
 	"tracker/internal/ui"
+	"tracker/pkg/timeparse"
 )
 
 var CloseCmd = &cobra.Command{
@@ -45,13 +47,29 @@ var PauseCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ticket := strings.ToUpper(args[0])
+		atStr, _ := cmd.Flags().GetString("at")
 
 		task, err := client.GetTaskByTicket(ticket)
 		if err != nil {
 			return fmt.Errorf("тикет %s не найден: %w", ticket, err)
 		}
 
-		if _, err := client.PauseTask(task.ID); err != nil {
+		var payload map[string]interface{}
+		if atStr != "" {
+			pauseTime, err := timeparse.Parse(atStr)
+			if err != nil {
+				return fmt.Errorf("ошибка в at: %w", err)
+			}
+			if pauseTime.After(time.Now()) {
+				return fmt.Errorf("время паузы не может быть в будущем")
+			}
+			// Отправляем время на сервер (ключ 'paused_at' зависит от вашего API)
+			payload = map[string]interface{}{
+				"paused_at": pauseTime.UTC().Format(time.RFC3339),
+			}
+		}
+
+		if _, err := client.PauseTask(task.ID, payload); err != nil {
 			return err
 		}
 
@@ -67,13 +85,25 @@ var ResumeCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ticket := strings.ToUpper(args[0])
+		startStr, _ := cmd.Flags().GetString("start")
 
 		task, err := client.GetTaskByTicket(ticket)
 		if err != nil {
 			return fmt.Errorf("тикет %s не найден: %w", ticket, err)
 		}
 
-		if _, err := client.ResumeTask(task.ID); err != nil {
+		var payload map[string]interface{}
+		if startStr != "" {
+			startTime, err := timeparse.Parse(startStr)
+			if err != nil {
+				return fmt.Errorf("ошибка в start: %w", err)
+			}
+			payload = map[string]interface{}{
+				"resumed_at": startTime.UTC().Format(time.RFC3339),
+			}
+		}
+
+		if _, err := client.ResumeTask(task.ID, payload); err != nil {
 			return err
 		}
 
@@ -134,5 +164,7 @@ var DeleteCmd = &cobra.Command{
 }
 
 func init() {
-	CloseCmd.Flags().String("solution", "Решено", "Статус решения")
+	CloseCmd.Flags().StringP("solution", "s", "Решено", "Статус решения")
+	PauseCmd.Flags().StringP("at", "t", "", "Время паузы (по умолчанию — текущее)")
+	ResumeCmd.Flags().StringP("start", "s", "", "Время возобновления")
 }

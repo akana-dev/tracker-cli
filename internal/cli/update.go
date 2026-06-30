@@ -79,7 +79,7 @@ func formatVersion(v string) string {
 }
 
 func init() {
-	updateCmd.Flags().Bool("check", false, "Только проверить наличие обновления")
-	updateCmd.Flags().String("version", "", "Установить конкретную версию")
-	updateCmd.Flags().Bool("pre-release", false, "Включая pre-release версии")
+	updateCmd.Flags().BoolP("check", "c", false, "Только проверить наличие обновления")
+	updateCmd.Flags().StringP("version", "v", "", "Установить конкретную версию")
+	updateCmd.Flags().BoolP("pre-release", "p", false, "Включая pre-release версии")
 }

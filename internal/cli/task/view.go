@@ -180,5 +180,5 @@ var ViewCmd = &cobra.Command{
 }
 
 func init() {
-	ViewCmd.Flags().Bool("no-comments", false, "Не показывать комментарии")
+	ViewCmd.Flags().BoolP("no-comments", "N", false, "Не показывать комментарии")
 }

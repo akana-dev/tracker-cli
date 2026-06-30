@@ -165,10 +165,10 @@ var companyDeleteCmd = &cobra.Command{
 func init() {
 	companyAddCmd.Flags().StringP("description", "d", "", "Описание")
 
-	companyListCmd.Flags().Bool("all", false, "Показать все компании (без пагинации)")
-	companyListCmd.Flags().Int("page", 1, "Номер страницы")
-	companyListCmd.Flags().Int("limit", service.DefaultPageSize, "Количество компаний на странице")
-	companyListCmd.Flags().Int("offset", 0, "Смещение от начала")
+	companyListCmd.Flags().BoolP("all", "a", false, "Показать все компании (без пагинации)")
+	companyListCmd.Flags().IntP("page", "p", 1, "Номер страницы")
+	companyListCmd.Flags().IntP("limit", "l", service.DefaultPageSize, "Количество компаний на странице")
+	companyListCmd.Flags().IntP("offset", "o", 0, "Смещение от начала")
 
 	companyCmd.AddCommand(companyListCmd)
 	companyCmd.AddCommand(companyAddCmd)
