@@ -125,7 +125,7 @@ var ViewCmd = &cobra.Command{
 							ui.Paused(fmt.Sprintf("на паузе (%s)", service.FormatDuration(pauseDuration))),
 						)
 					} else {
-						elapsed := time.Now().Sub(startLocal)
+						elapsed := time.Since(startLocal)
 						fmt.Printf("%s — %s\n",
 							startStr,
 							ui.InProgress(fmt.Sprintf("в работе (%s)", service.FormatDuration(elapsed))),

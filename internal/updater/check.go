@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -77,7 +79,7 @@ func CheckForUpdate(ctx context.Context, owner, repo string, includePreRelease b
 		latestVersion = latestVersion[1:]
 	}
 
-	hasUpdate := latestVersion != currentVersion
+	hasUpdate := compareSemver(latestVersion, currentVersion) > 0
 	downloadURL := findAssetForPlatform(release.Assets)
 
 	return &CheckResult{
@@ -170,4 +172,36 @@ func findAssetForPlatform(assets []GitHubAsset) string {
 	}
 
 	return ""
+}
+
+func compareSemver(v1, v2 string) int {
+	v1 = strings.TrimPrefix(v1, "v")
+	v2 = strings.TrimPrefix(v2, "v")
+
+	parts1 := strings.Split(v1, ".")
+	parts2 := strings.Split(v2, ".")
+
+	maxLen := len(parts1)
+	if len(parts2) > maxLen {
+		maxLen = len(parts2)
+	}
+
+	for i := 0; i < maxLen; i++ {
+		var p1, p2 int
+		if i < len(parts1) {
+			p1, _ = strconv.Atoi(parts1[i])
+		}
+		if i < len(parts2) {
+			p2, _ = strconv.Atoi(parts2[i])
+		}
+
+		if p1 < p2 {
+			return -1
+		}
+		if p1 > p2 {
+			return 1
+		}
+	}
+
+	return 0
 }
