@@ -52,9 +52,20 @@ var ViewCmd = &cobra.Command{
 			ui.Label("Исполнитель", ui.Cyan(task.GetAssigneeDisplay())+ui.Dim(" (создатель)"))
 		}
 
-		taskTags, _ := tags.Get(ticket)
-		if len(taskTags) > 0 {
-			ui.Label("Теги", ui.Cyan(strings.Join(taskTags, ", ")))
+		if len(task.Tags) > 0 {
+			tagInfos := make([]ui.TagInfo, 0, len(task.Tags))
+			for _, tag := range task.Tags {
+				tagInfos = append(tagInfos, ui.TagInfo{
+					Name:  tag.Name,
+					Color: tag.Color,
+				})
+			}
+			ui.Label("Теги", ui.TagsDisplay(tagInfos))
+		} else {
+			taskTags, _ := tags.Get(ticket)
+			if len(taskTags) > 0 {
+				ui.Label("Теги", ui.Cyan(strings.Join(taskTags, ", ")))
+			}
 		}
 
 		fmt.Println()

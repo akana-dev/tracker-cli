@@ -7,9 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"tracker/internal/client"
-	"tracker/internal/models"
 	"tracker/internal/service"
-	"tracker/internal/tags"
 	"tracker/internal/ui"
 	"tracker/pkg/table"
 	"tracker/pkg/timeparse"
@@ -42,8 +40,12 @@ var ListCmd = &cobra.Command{
 		if search, _ := cmd.Flags().GetString("search"); search != "" {
 			params["search"] = search
 		}
-
-		tagFilter, _ := cmd.Flags().GetStringSlice("tag")
+		if searchComments, _ := cmd.Flags().GetBool("search-comments"); searchComments {
+			params["search_comments"] = "true"
+		}
+		if tagFilter, _ := cmd.Flags().GetStringSlice("tag"); len(tagFilter) > 0 {
+			params["tags"] = strings.Join(tagFilter, ",")
+		}
 
 		all, _ := cmd.Flags().GetBool("all")
 		page, _ := cmd.Flags().GetInt("page")
@@ -81,25 +83,6 @@ var ListCmd = &cobra.Command{
 		}
 
 		tasks := resp.Tasks
-
-		if len(tagFilter) > 0 {
-			ticketsWithTags, err := tags.FilterTicketsByTag(tagFilter)
-			if err != nil {
-				return err
-			}
-			tagSet := make(map[string]bool, len(ticketsWithTags))
-			for _, t := range ticketsWithTags {
-				tagSet[t] = true
-			}
-
-			var filtered []models.Task
-			for _, t := range tasks {
-				if tagSet[t.Ticket] {
-					filtered = append(filtered, t)
-				}
-			}
-			tasks = filtered
-		}
 
 		if len(tasks) == 0 {
 			fmt.Println(ui.Warning("Задачи не найдены."))
@@ -142,12 +125,24 @@ var ListCmd = &cobra.Command{
 		})
 
 		for _, t := range tasks {
+			taskCell := service.FormatTaskCell(t)
+			if len(t.Tags) > 0 {
+				tagInfos := make([]ui.TagInfo, 0, len(t.Tags))
+				for _, tag := range t.Tags {
+					tagInfos = append(tagInfos, ui.TagInfo{
+						Name:  tag.Name,
+						Color: tag.Color,
+					})
+				}
+				taskCell += " " + ui.Dim("[") + ui.TagsDisplay(tagInfos) + ui.Dim("]")
+			}
+
 			tbl.AddRow(
 				ui.Ticket(t.Ticket),
 				t.StartTime.Local().Format("02.01.2006"),
 				service.FormatSessions(t),
 				fmt.Sprintf("%.1f", service.CalculateTaskHours(t)),
-				service.FormatTaskCell(t),
+				taskCell,
 				ui.Cyan(t.GetAssigneeDisplay()),
 				service.FormatStatus(t),
 			)
@@ -176,7 +171,8 @@ func init() {
 	ListCmd.Flags().StringP("solution", "S", "", "Фильтр по статусу")
 	ListCmd.Flags().StringP("assignee", "a", "", "Фильтр по исполнителю")
 	ListCmd.Flags().StringP("search", "s", "", "Поиск")
-	ListCmd.Flags().StringSlice("tag", nil, "Фильтр по тегам")
+	ListCmd.Flags().BoolP("search-comments", "C", false, "Искать также в комментариях")
+	ListCmd.Flags().StringSliceP("tag", "T", nil, "Фильтр по тегам (через запятую)")
 
 	ListCmd.Flags().BoolP("all", "A", false, "Показать все задачи")
 	ListCmd.Flags().IntP("page", "p", 1, "Номер страницы")

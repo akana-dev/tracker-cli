@@ -2,6 +2,8 @@ package ui
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/fatih/color"
 )
@@ -118,4 +120,57 @@ func Paused(text string) string {
 
 func Closed(text string) string {
 	return Dim(text)
+}
+
+func TagWithColor(name, hexColor string) string {
+	if hexColor == "" {
+		return name
+	}
+
+	r, g, b, ok := parseHexColor(hexColor)
+	if !ok {
+		return name
+	}
+
+	return fmt.Sprintf("\x1b[38;2;%d;%d;%dm%s\x1b[0m", r, g, b, name)
+}
+
+func parseHexColor(hex string) (r, g, b uint8, ok bool) {
+	hex = strings.TrimPrefix(hex, "#")
+	if len(hex) != 6 {
+		return 0, 0, 0, false
+	}
+
+	rVal, err := strconv.ParseUint(hex[0:2], 16, 8)
+	if err != nil {
+		return 0, 0, 0, false
+	}
+	gVal, err := strconv.ParseUint(hex[2:4], 16, 8)
+	if err != nil {
+		return 0, 0, 0, false
+	}
+	bVal, err := strconv.ParseUint(hex[4:6], 16, 8)
+	if err != nil {
+		return 0, 0, 0, false
+	}
+
+	return uint8(rVal), uint8(gVal), uint8(bVal), true
+}
+
+func TagsDisplay(tags []TagInfo) string {
+	if len(tags) == 0 {
+		return ""
+	}
+
+	parts := make([]string, 0, len(tags))
+	for _, t := range tags {
+		parts = append(parts, TagWithColor(t.Name, t.Color))
+	}
+
+	return strings.Join(parts, ", ")
+}
+
+type TagInfo struct {
+	Name  string
+	Color string
 }

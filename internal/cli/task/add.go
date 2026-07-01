@@ -31,6 +31,7 @@ var AddCmd = &cobra.Command{
 		assignee, _ := cmd.Flags().GetString("assignee")
 		solution, _ := cmd.Flags().GetString("solution")
 		comment, _ := cmd.Flags().GetString("comment")
+		tagNames, _ := cmd.Flags().GetStringSlice("tag")
 
 		if err := service.ValidateComment(comment); err != nil {
 			return err
@@ -73,6 +74,14 @@ var AddCmd = &cobra.Command{
 			payload["comment"] = comment
 		}
 
+		if len(tagNames) > 0 {
+			tagIDs, err := resolveTagNamesToIDs(tagNames)
+			if err != nil {
+				return err
+			}
+			payload["tag_ids"] = tagIDs
+		}
+
 		task, err := client.CreateTask(payload)
 		if err != nil {
 			return err
@@ -92,4 +101,5 @@ func init() {
 	AddCmd.Flags().StringP("assignee", "a", "", "Исполнитель")
 	AddCmd.Flags().StringP("solution", "S", "", "Статус")
 	AddCmd.Flags().StringP("comment", "C", "", "Комментарий")
+	AddCmd.Flags().StringSliceP("tag", "T", nil, "Теги задачи (можно указать несколько)")
 }

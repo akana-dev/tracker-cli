@@ -10,31 +10,21 @@ import (
 	"tracker/internal/client"
 	"tracker/internal/config"
 	"tracker/internal/service"
-	"tracker/internal/tags"
 	"tracker/internal/templates"
 	"tracker/internal/ui"
 	"tracker/pkg/timeparse"
 )
 
 var FromCmd = &cobra.Command{
-	Use:   "from [шаблон]",
+	Use:   "from [имя_шаблона]",
 	Short: "Создать задачу из шаблона",
-	Long: `Создать новую задачу на основе шаблона.
-
-Все параметры шаблона можно переопределить через флаги.
-
-Примеры:
-  tracker task from daily-standup
-  tracker task from daily-standup --title "Планёрка по проекту X"
-  tracker task from daily-standup --start 10:00
-  tracker task from daily-standup --tag urgent`,
-	Args: cobra.ExactArgs(1),
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		templateName := args[0]
 
 		tmpl, err := templates.Load(templateName)
 		if err != nil {
-			return err
+			return fmt.Errorf("шаблон '%s' не найден: %w", templateName, err)
 		}
 
 		title := tmpl.Title
@@ -67,13 +57,6 @@ var FromCmd = &cobra.Command{
 			comment = c
 		}
 
-		start, _ := cmd.Flags().GetString("start")
-		end, _ := cmd.Flags().GetString("end")
-
-		tagsFromTemplate := tmpl.Tags
-		tagsFromFlag, _ := cmd.Flags().GetStringSlice("tag")
-		allTags := append(tagsFromTemplate, tagsFromFlag...)
-
 		if err := service.ValidateTitle(title); err != nil {
 			return err
 		}
@@ -84,7 +67,8 @@ var FromCmd = &cobra.Command{
 			return err
 		}
 
-		startTime, err := timeparse.Parse(start)
+		startStr, _ := cmd.Flags().GetString("start")
+		startTime, err := timeparse.Parse(startStr)
 		if err != nil {
 			return fmt.Errorf("ошибка в start: %w", err)
 		}
@@ -95,13 +79,14 @@ var FromCmd = &cobra.Command{
 			"start_time":   startTime.UTC().Format(time.RFC3339),
 		}
 
-		if end != "" {
-			endTime, err := timeparse.Parse(end)
+		if endStr, _ := cmd.Flags().GetString("end"); endStr != "" {
+			endTime, err := timeparse.Parse(endStr)
 			if err != nil {
 				return fmt.Errorf("ошибка в end: %w", err)
 			}
 			payload["end_time"] = endTime.UTC().Format(time.RFC3339)
 		}
+
 		if assignee != "" {
 			payload["assignee_username"] = assignee
 		}
@@ -112,23 +97,29 @@ var FromCmd = &cobra.Command{
 			payload["comment"] = comment
 		}
 
+		tagNames, _ := cmd.Flags().GetStringSlice("tag")
+		if len(tagNames) > 0 {
+			tagIDs, err := resolveTagNamesToIDs(tagNames)
+			if err != nil {
+				return err
+			}
+			payload["tag_ids"] = tagIDs
+		}
+
 		task, err := client.CreateTask(payload)
 		if err != nil {
 			return err
 		}
 
-		if len(allTags) > 0 {
-			if err := tags.Set(task.Ticket, allTags); err != nil {
-				fmt.Println(ui.Warningf("Задача создана, но не удалось применить теги: %v", err))
-			}
+		fmt.Println(ui.Checkmark(), ui.Successf("Создана задача из шаблона '%s': %s",
+			templateName, ui.Ticket(task.Ticket)))
+		fmt.Println(ui.Dimf("Название: %s", task.Title))
+		fmt.Println(ui.Dimf("Исполнитель: %s", task.GetAssigneeDisplay()))
+
+		if len(tagNames) > 0 {
+			fmt.Println(ui.Dimf("Теги: %s", strings.Join(tagNames, ", ")))
 		}
 
-		fmt.Println(ui.Checkmark(), ui.Successf("Создана задача %s: %s",
-			ui.Ticket(task.Ticket), ui.Bold(task.Title)))
-		if len(allTags) > 0 {
-			fmt.Println(ui.Dimf("Теги: %s", strings.Join(allTags, ", ")))
-		}
-		fmt.Println(ui.Dimf("Исполнитель: %s", task.GetAssigneeDisplay()))
 		return nil
 	},
 }
@@ -141,5 +132,5 @@ func init() {
 	FromCmd.Flags().StringP("assignee", "a", "", "Переопределить исполнителя")
 	FromCmd.Flags().StringP("solution", "S", "", "Переопределить статус")
 	FromCmd.Flags().StringP("comment", "C", "", "Переопределить комментарий")
-	FromCmd.Flags().StringSlice("tag", nil, "Дополнительные теги")
+	FromCmd.Flags().StringSliceP("tag", "T", nil, "Дополнительные теги")
 }

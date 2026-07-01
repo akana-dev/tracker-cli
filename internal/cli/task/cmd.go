@@ -23,5 +23,6 @@ func init() {
 	Cmd.AddCommand(DeleteCmd)
 	Cmd.AddCommand(ExportCmd)
 	Cmd.AddCommand(FromCmd)
+	Cmd.AddCommand(BulkCmd)
 	Cmd.AddCommand(comment.CommentCmd)
 }

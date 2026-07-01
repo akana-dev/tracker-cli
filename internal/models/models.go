@@ -47,6 +47,7 @@ type Task struct {
 	CanEdit            bool          `json:"can_edit"`
 	CanDelete          bool          `json:"can_delete"`
 	Comments           []Comment     `json:"comments,omitempty"`
+	Tags               []Tag         `json:"tags,omitempty"`
 }
 
 func (t *Task) GetAssigneeDisplay() string {
@@ -217,7 +218,7 @@ type Template struct {
 	Comment string `yaml:"comment,omitempty" json:"comment,omitempty"`
 
 	// Tags — список тегов (опционально)
-	Tags []string `yaml:"tags,omitempty" json:"tags,omitempty"`
+	Tags []Tag `json:"tags,omitempty"`
 }
 
 type Comment struct {
@@ -245,4 +246,13 @@ func (u *CommentUser) GetDisplayName() string {
 		return fmt.Sprintf("%s (%s)", *u.FullName, u.Username)
 	}
 	return u.Username
+}
+
+type Tag struct {
+	ID                int    `json:"id"`
+	Name              string `json:"name"`
+	Color             string `json:"color,omitempty"`
+	CreatedByID       int    `json:"created_by_id,omitempty"`
+	CreatedByUsername string `json:"created_by_username,omitempty"`
+	CreatedAt         string `json:"created_at,omitempty"`
 }

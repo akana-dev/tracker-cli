@@ -598,3 +598,154 @@ func GetTaskWithComments(taskID int) (*models.Task, error) {
 	err := doRequest("GET", fmt.Sprintf("/tasks/%d", taskID), nil, &resp)
 	return &resp, err
 }
+
+type BulkResult struct {
+	TaskID int    `json:"task_id"`
+	Status string `json:"status"`
+	Detail string `json:"detail,omitempty"`
+}
+
+type BulkResponse struct {
+	Total     int          `json:"total"`
+	Succeeded int          `json:"succeeded"`
+	Failed    int          `json:"failed"`
+	Results   []BulkResult `json:"results"`
+}
+
+func BulkCloseTasks(taskIDs []int) (*BulkResponse, error) {
+	var resp BulkResponse
+	payload := map[string]interface{}{
+		"task_ids": taskIDs,
+	}
+	err := doRequest("POST", "/tasks/bulk/close", payload, &resp)
+	return &resp, err
+}
+
+func BulkAssignTasks(taskIDs []int, assignee string) (*BulkResponse, error) {
+	var resp BulkResponse
+	payload := map[string]interface{}{
+		"task_ids":          taskIDs,
+		"assignee_username": assignee,
+	}
+	err := doRequest("POST", "/tasks/bulk/assign", payload, &resp)
+	return &resp, err
+}
+
+func BulkDeleteTasks(taskIDs []int) (*BulkResponse, error) {
+	var resp BulkResponse
+	payload := map[string]interface{}{
+		"task_ids": taskIDs,
+	}
+	err := doRequest("POST", "/tasks/bulk/delete", payload, &resp)
+	return &resp, err
+}
+
+type Tag struct {
+	ID                int    `json:"id"`
+	Name              string `json:"name"`
+	Color             string `json:"color,omitempty"`
+	CreatedByID       int    `json:"created_by_id"`
+	CreatedByUsername string `json:"created_by_username"`
+	CreatedAt         string `json:"created_at"`
+}
+
+func CreateTag(name, color string) (*models.Tag, error) {
+	var resp models.Tag
+	payload := map[string]interface{}{
+		"name": name,
+	}
+	if color != "" {
+		payload["color"] = color
+	}
+	err := doRequest("POST", "/tags", payload, &resp)
+	return &resp, err
+}
+
+func ListTags(search string) ([]models.Tag, error) {
+	params := url.Values{}
+	if search != "" {
+		params.Set("search", search)
+	}
+
+	var resp []models.Tag
+	err := doRequest("GET", "/tags?"+params.Encode(), nil, &resp)
+	if err == nil {
+		return resp, nil
+	}
+
+	var respObj struct {
+		Items []models.Tag `json:"items"`
+	}
+	err = doRequest("GET", "/tags?"+params.Encode(), nil, &respObj)
+	if err != nil {
+		return nil, err
+	}
+
+	return respObj.Items, nil
+}
+
+func UpdateTag(tagID int, payload map[string]interface{}) (*models.Tag, error) {
+	var resp models.Tag
+	err := doRequest("PUT", fmt.Sprintf("/tags/%d", tagID), payload, &resp)
+	return &resp, err
+}
+
+func DeleteTag(tagID int) error {
+	return doRequest("DELETE", fmt.Sprintf("/tags/%d", tagID), nil, nil)
+}
+
+type Template struct {
+	ID              int    `json:"id"`
+	Name            string `json:"name"`
+	Title           string `json:"title"`
+	Description     string `json:"description,omitempty"`
+	CompanyName     string `json:"company_name,omitempty"`
+	DefaultSolution string `json:"default_solution,omitempty"`
+	IsPublic        bool   `json:"is_public"`
+	OwnerID         int    `json:"owner_id"`
+	OwnerUsername   string `json:"owner_username"`
+	CreatedAt       string `json:"created_at"`
+	UpdatedAt       string `json:"updated_at,omitempty"`
+	CanEdit         bool   `json:"can_edit"`
+	CanDelete       bool   `json:"can_delete"`
+}
+
+func CreateTemplate(name, title, description, company, solution string, isPublic bool) (*Template, error) {
+	var resp Template
+	payload := map[string]interface{}{
+		"name":             name,
+		"title":            title,
+		"description":      description,
+		"company_name":     company,
+		"default_solution": solution,
+		"is_public":        isPublic,
+	}
+	err := doRequest("POST", "/templates", payload, &resp)
+	return &resp, err
+}
+
+func ListTemplates(includeAll bool) ([]Template, error) {
+	var resp []Template
+	params := url.Values{}
+	if includeAll {
+		params.Set("include_all", "true")
+	}
+	err := doRequest("GET", "/templates?"+params.Encode(), nil, &resp)
+	return resp, err
+}
+
+func UseTemplate(templateID int) (*models.Task, error) {
+	var resp models.Task
+	err := doRequest("POST", fmt.Sprintf("/templates/%d/use", templateID), nil, &resp)
+	return &resp, err
+}
+
+func UpdateTemplate(templateID int, payload map[string]interface{}) (*Template, error) {
+	var resp Template
+	err := doRequest("PUT", fmt.Sprintf("/templates/%d", templateID), payload, &resp)
+	return &resp, err
+}
+
+func DeleteTemplate(templateID int) error {
+	return doRequest("DELETE", fmt.Sprintf("/templates/%d", templateID), nil, nil)
+}

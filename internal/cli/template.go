@@ -2,288 +2,181 @@ package cli
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
+	"strconv"
 	"strings"
+	"tracker/internal/client"
+	"tracker/internal/ui"
 
 	"github.com/spf13/cobra"
-	"go.yaml.in/yaml/v3"
-
-	"tracker/internal/models"
-	"tracker/internal/templates"
-	"tracker/internal/ui"
-	"tracker/pkg/table"
 )
 
 var templateCmd = &cobra.Command{
 	Use:   "template",
 	Short: "Управление шаблонами задач",
-	Long: `Шаблоны позволяют быстро создавать задачи с предопределёнными параметрами.
-
-Шаблоны хранятся в ~/.tracker/templates/<name>.yaml в формате YAML.
-
-Примеры:
-  tracker template add daily-standup
-  tracker template list
-  tracker template show daily-standup
-  tracker task from daily-standup
-  tracker task from daily-standup --title "Новое название"`,
 }
 
 var templateAddCmd = &cobra.Command{
 	Use:   "add [имя]",
-	Short: "Создать новый шаблон",
-	Long: `Создать новый шаблон. Откроет редактор ($EDITOR или nano) с примером YAML.
-
-После сохранения файл будет проверен и добавлен в список шаблонов.`,
-	Args: cobra.ExactArgs(1),
+	Short: "Создать шаблон",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
+		title, _ := cmd.Flags().GetString("title")
+		description, _ := cmd.Flags().GetString("description")
+		company, _ := cmd.Flags().GetString("company")
+		solution, _ := cmd.Flags().GetString("solution")
+		isPublic, _ := cmd.Flags().GetBool("public")
 
-		if templates.Exists(name) {
-			return fmt.Errorf("шаблон %q уже существует", name)
+		if title == "" {
+			return fmt.Errorf("обязательный параметр: --title")
 		}
 
-		tmpFile, err := os.CreateTemp("", "tracker-template-*.yaml")
-		if err != nil {
-			return fmt.Errorf("не удалось создать временный файл: %w", err)
-		}
-		tmpPath := tmpFile.Name()
-		defer os.Remove(tmpPath)
-
-		if _, err := tmpFile.WriteString(templates.GenerateExample()); err != nil {
-			tmpFile.Close()
-			return fmt.Errorf("не удалось записать пример: %w", err)
-		}
-		tmpFile.Close()
-
-		content, err := os.ReadFile(tmpPath)
-		if err != nil {
-			return err
-		}
-		content = []byte(strings.Replace(string(content), "name: example", "name: "+name, 1))
-		if err := os.WriteFile(tmpPath, content, 0600); err != nil {
-			return err
-		}
-
-		editor := os.Getenv("EDITOR")
-		if editor == "" {
-			editor = "nano"
-		}
-
-		fmt.Println(ui.Dimf("Открываю редактор %s...", editor))
-		fmt.Println(ui.Dim("Заполните шаблон и сохраните файл. Для отмены закройте редактор без изменений."))
-		fmt.Println()
-
-		editorCmd := exec.Command(editor, tmpPath)
-		editorCmd.Stdin = os.Stdin
-		editorCmd.Stdout = os.Stdout
-		editorCmd.Stderr = os.Stderr
-		if err := editorCmd.Run(); err != nil {
-			return fmt.Errorf("ошибка редактора: %w", err)
-		}
-
-		resultContent, err := os.ReadFile(tmpPath)
+		template, err := client.CreateTemplate(name, title, description, company, solution, isPublic)
 		if err != nil {
 			return err
 		}
 
-		tmpl, err := templates.ParseYAML(resultContent)
-		if err != nil {
-			return fmt.Errorf("ошибка парсинга YAML: %w", err)
-		}
-
-		if strings.TrimSpace(tmpl.Title) == "" {
-			return fmt.Errorf("название задачи (title) обязательно")
-		}
-
-		tmpl.Name = name
-		if err := templates.Save(tmpl); err != nil {
-			return err
-		}
-
-		fmt.Println(ui.Checkmark(), ui.Successf("Шаблон %s создан", ui.Bold(name)))
+		fmt.Println(ui.Checkmark(), ui.Successf("Шаблон создан: %s (ID: %d)", template.Name, template.ID))
 		return nil
 	},
 }
 
 var templateListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "Показать список шаблонов",
+	Short: "Показать все шаблоны",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		allTemplates, err := templates.List()
+		includeAll, _ := cmd.Flags().GetBool("all")
+		templates, err := client.ListTemplates(includeAll)
 		if err != nil {
 			return err
 		}
 
-		if len(allTemplates) == 0 {
-			fmt.Println(ui.Warning("Шаблоны не найдены."))
-			fmt.Println(ui.Dim("Создайте шаблон: tracker template add <имя>"))
+		if len(templates) == 0 {
+			fmt.Println(ui.Info("Шаблоны не найдены"))
 			return nil
 		}
 
-		fmt.Println()
-		tbl := table.New("Имя", "Название", "Компания", "Теги")
-		tbl.SetColumnWidths(map[int]int{0: 20, 1: 40, 2: 15, 3: 30})
-		for _, tmpl := range allTemplates {
-			tagsStr := "—"
-			if len(tmpl.Tags) > 0 {
-				tagsStr = strings.Join(tmpl.Tags, ", ")
+		for _, t := range templates {
+			publicStr := ""
+			if t.IsPublic {
+				publicStr = " (публичный)"
 			}
-			company := tmpl.Company
-			if company == "" {
-				company = ui.Dim("—")
-			}
-			tbl.AddRow(
-				ui.Bold(tmpl.Name),
-				tmpl.Title,
-				company,
-				ui.Cyan(tagsStr),
-			)
+			fmt.Printf("  %d. %s - %s%s\n", t.ID, t.Name, t.Title, publicStr)
 		}
-		tbl.Render()
-		fmt.Println()
 
 		return nil
 	},
 }
 
 var templateShowCmd = &cobra.Command{
-	Use:   "show [имя]",
-	Short: "Показать содержимое шаблона",
+	Use:   "show [id]",
+	Short: "Показать детали шаблона",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		name := args[0]
+		id, err := strconv.Atoi(args[0])
+		if err != nil {
+			return fmt.Errorf("некорректный ID: %s", args[0])
+		}
 
-		tmpl, err := templates.Load(name)
+		templates, err := client.ListTemplates(true)
 		if err != nil {
 			return err
 		}
 
-		fmt.Println()
-		ui.Header(fmt.Sprintf("Шаблон: %s", ui.CyanBold(tmpl.Name)))
-		ui.Label("Название", ui.Bold(tmpl.Title))
-		if tmpl.Company != "" {
-			ui.Label("Компания", ui.Cyan(tmpl.Company))
+		var template *client.Template
+		for _, t := range templates {
+			if t.ID == id {
+				template = &t
+				break
+			}
 		}
-		if tmpl.Assignee != "" {
-			ui.Label("Исполнитель", ui.Cyan(tmpl.Assignee))
+
+		if template == nil {
+			return fmt.Errorf("шаблон #%d не найден", id)
 		}
-		if tmpl.Solution != "" {
-			ui.Label("Решение", tmpl.Solution)
+
+		fmt.Println(ui.Bold("ID:"), template.ID)
+		fmt.Println(ui.Bold("Имя:"), template.Name)
+		fmt.Println(ui.Bold("Заголовок:"), template.Title)
+		if template.Description != "" {
+			fmt.Println(ui.Bold("Описание:"), template.Description)
 		}
-		if len(tmpl.Tags) > 0 {
-			ui.Label("Теги", ui.Cyan(strings.Join(tmpl.Tags, ", ")))
+		if template.CompanyName != "" {
+			fmt.Println(ui.Bold("Компания:"), template.CompanyName)
 		}
-		if tmpl.Comment != "" {
-			ui.Label("Комментарий", "")
-			fmt.Println("    " + tmpl.Comment)
+		if template.DefaultSolution != "" {
+			fmt.Println(ui.Bold("Статус:"), template.DefaultSolution)
 		}
-		fmt.Println()
+		fmt.Println(ui.Bold("Публичный:"), template.IsPublic)
+		fmt.Println(ui.Bold("Владелец:"), template.OwnerUsername)
 
 		return nil
 	},
 }
 
-var templateRemoveCmd = &cobra.Command{
-	Use:   "remove [имя]",
+var templateUseCmd = &cobra.Command{
+	Use:   "use [id]",
+	Short: "Создать задачу из шаблона",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		id, err := strconv.Atoi(args[0])
+		if err != nil {
+			return fmt.Errorf("некорректный ID: %s", args[0])
+		}
+
+		task, err := client.UseTemplate(id)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println(ui.Checkmark(), ui.Successf("Задача создана: %s (%s)", task.Ticket, task.Title))
+		return nil
+	},
+}
+
+var templateDeleteCmd = &cobra.Command{
+	Use:   "delete [id]",
 	Short: "Удалить шаблон",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		name := args[0]
-		if err := templates.Delete(name); err != nil {
-			return err
-		}
-
-		fmt.Println(ui.Checkmark(), ui.Successf("Шаблон %s удалён", ui.Bold(name)))
-		return nil
-	},
-}
-
-var templateEditCmd = &cobra.Command{
-	Use:   "edit [имя]",
-	Short: "Редактировать шаблон",
-	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		name := args[0]
-
-		tmpl, err := templates.Load(name)
+		id, err := strconv.Atoi(args[0])
 		if err != nil {
+			return fmt.Errorf("некорректный ID: %s", args[0])
+		}
+
+		force, _ := cmd.Flags().GetBool("force")
+		if !force {
+			fmt.Print(ui.Warning("Удалить шаблон? [y/N]: "))
+			var confirm string
+			fmt.Scanln(&confirm)
+			if strings.ToLower(confirm) != "y" {
+				return nil
+			}
+		}
+
+		if err := client.DeleteTemplate(id); err != nil {
 			return err
 		}
 
-		tmpFile, err := os.CreateTemp("", "tracker-template-*.yaml")
-		if err != nil {
-			return fmt.Errorf("не удалось создать временный файл: %w", err)
-		}
-		tmpPath := tmpFile.Name()
-		defer os.Remove(tmpPath)
-
-		content, err := templates.MarshalYAML(tmpl)
-		if err != nil {
-			tmpFile.Close()
-			return err
-		}
-
-		if _, err := tmpFile.Write(content); err != nil {
-			tmpFile.Close()
-			return err
-		}
-		tmpFile.Close()
-
-		editor := os.Getenv("EDITOR")
-		if editor == "" {
-			editor = "nano"
-		}
-
-		editorCmd := exec.Command(editor, tmpPath)
-		editorCmd.Stdin = os.Stdin
-		editorCmd.Stdout = os.Stdout
-		editorCmd.Stderr = os.Stderr
-		if err := editorCmd.Run(); err != nil {
-			return fmt.Errorf("ошибка редактора: %w", err)
-		}
-
-		resultContent, err := os.ReadFile(tmpPath)
-		if err != nil {
-			return err
-		}
-
-		updated, err := templates.ParseYAML(resultContent)
-		if err != nil {
-			return fmt.Errorf("ошибка парсинга YAML: %w", err)
-		}
-
-		if strings.TrimSpace(updated.Title) == "" {
-			return fmt.Errorf("название задачи (title) обязательно")
-		}
-
-		updated.Name = name
-		if err := templates.Save(updated); err != nil {
-			return err
-		}
-
-		fmt.Println(ui.Checkmark(), ui.Successf("Шаблон %s обновлён", ui.Bold(name)))
+		fmt.Println(ui.Checkmark(), ui.Success("Шаблон удалён"))
 		return nil
 	},
 }
 
 func init() {
+	templateAddCmd.Flags().StringP("title", "t", "", "Заголовок задачи (обязательный)")
+	templateAddCmd.Flags().StringP("description", "d", "", "Описание")
+	templateAddCmd.Flags().StringP("company", "c", "", "Компания")
+	templateAddCmd.Flags().StringP("solution", "s", "", "Статус по умолчанию")
+	templateAddCmd.Flags().BoolP("public", "p", false, "Публичный шаблон")
+
+	templateListCmd.Flags().BoolP("all", "a", false, "Показать все шаблоны (только для admin)")
+
+	templateDeleteCmd.Flags().BoolP("force", "f", false, "Пропустить подтверждение")
+
 	templateCmd.AddCommand(templateAddCmd)
 	templateCmd.AddCommand(templateListCmd)
 	templateCmd.AddCommand(templateShowCmd)
-	templateCmd.AddCommand(templateRemoveCmd)
-	templateCmd.AddCommand(templateEditCmd)
-}
-
-func ParseYAML(data []byte) (*models.Template, error) {
-	var tmpl models.Template
-	if err := yaml.Unmarshal(data, &tmpl); err != nil {
-		return nil, err
-	}
-	return &tmpl, nil
-}
-
-func MarshalYAML(tmpl *models.Template) ([]byte, error) {
-	return yaml.Marshal(tmpl)
+	templateCmd.AddCommand(templateUseCmd)
+	templateCmd.AddCommand(templateDeleteCmd)
 }

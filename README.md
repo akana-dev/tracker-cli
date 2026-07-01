@@ -1,340 +1,353 @@
 # Tracker CLI
 
-Консольный трекер времени задач с поддержкой нескольких серверов, комментариев, тегов и шаблонов.
-
-[![Release](https://img.shields.io/github/v/release/akana-dev/tracker-cli)](https://github.com/akana-dev/tracker-cli/releases)
-[![Platforms](https://img.shields.io/badge/platforms-linux%20%7C%20macos%20%7C%20windows-blue)](https://github.com/akana-dev/tracker-cli/releases)
-[![License](https://img.shields.io/github/license/akana-dev/tracker-cli)](LICENSE)
+Консольный трекер времени задач на Go с поддержкой нескольких серверов, комментариев, тегов, шаблонов, bulk-операций и автообновления.
 
 ## Возможности
 
-- **Управление задачами** — создание, редактирование, пауза, возобновление, закрытие
-- **Комментарии** — с поддержкой Markdown и упоминаниями `@username`
-- **Теги** — гибкая классификация задач
-- **Шаблоны** — быстрое создание типовых задач из YAML-файлов
-- **Экспорт** — в CSV, JSON, XLSX с фильтрацией и пресетами
-- **Несколько серверов** — переключение между разными API
-- **Авторизация** — по паролю или через Active Directory
-- **Алиасы** — короткие команды для частых действий
-- **Автообновление** — проверка и установка новых версий одной командой
-- **Часовые пояса** — корректная работа с DST и локальным временем
+- **Множественные серверы** — работа с несколькими трекерами одновременно
+- **Управление задачами** — создание, редактирование, закрытие, пауза, возобновление
+- **Кастомные времена** — указание произвольного времени для pause/resume
+- **Комментарии** — Markdown, @mentions, watch через polling
+- **Серверные теги** — классификация задач с цветовой маркировкой (True Color)
+- **Серверные шаблоны** — предзаполненные наборы для быстрого создания задач
+- **Bulk-операции** — массовое закрытие, назначение, удаление задач
+- **Поиск** — по названию, комментариям задач и содержимому комментариев
+- **Экспорт** — CSV, JSON, XLSX с пресетами и относительными датами
+- **Автообновление** — через GitHub Releases с проверкой checksums
+- **Алиасы** — короткие команды для частых операций
+- **Относительные даты** — `today`, `last 7 days`, `this month`, `last monday`
 
 ## Установка
 
-### Через GitHub Releases (рекомендуется)
-
-Скачайте бинарник для вашей платформы со страницы [Releases](https://github.com/akana-dev/tracker-cli/releases):
+### Через curl/wget
 
 ```bash
-# Linux amd64
-curl -L https://github.com/akana-dev/tracker-cli/releases/latest/download/tracker-linux-amd64 -o /usr/local/bin/tracker
-chmod +x /usr/local/bin/tracker
+# Linux/macOS
+curl -fsSL https://github.com/akana-dev/tracker-cli/releases/latest/download/tracker-$(uname -s)-$(uname -m) -o tracker
+chmod +x tracker
+sudo mv tracker /usr/local/bin/
 
-# macOS arm64 (Apple Silicon)
-curl -L https://github.com/akana-dev/tracker-cli/releases/latest/download/tracker-darwin-arm64 -o /usr/local/bin/tracker
-chmod +x /usr/local/bin/tracker
-
-# Windows
-# Скачайте tracker-windows-amd64.exe и добавьте в PATH
+# Проверка версии
+tracker --version
 ```
 
-### Автоматическое обновление
-
-Если tracker уже установлен:
+### Через Go
 
 ```bash
-tracker update
+go install github.com/akana-dev/tracker-cli/cmd/tracker@latest
 ```
 
-### Сборка из исходников
-
-Требования: Go 1.26+
+### Автообновление
 
 ```bash
-git clone https://github.com/akana-dev/tracker-cli.git
-cd tracker-cli
-make build
-sudo make install
+tracker update              # Обновить до последней версии
+tracker update --check      # Только проверить наличие обновления
+tracker update --pre-release # Включая pre-release версии
 ```
 
 ## Быстрый старт
 
 ```bash
-# 1. Настройка подключения к серверу
+# 1. Настройка сервера
 tracker configure
+tracker server add work https://tracker.example.com
 
 # 2. Авторизация
-tracker login
+tracker login --username ivanov
 
 # 3. Создание задачи
-tracker task add "Исправить баг в авторизации" --company ACME
+tracker task add "Исправить баг в авторизации" --company ACME --tag bug --tag urgent
 
-# 4. Просмотр списка задач
+# 4. Просмотр задач
 tracker task list --today
+tracker task list --tag bug
 
-# 5. Добавление комментария
-tracker task comment add ACME-1 "Нашёл причину, исправляю"
+# 5. Детали задачи
+tracker task view ACME-15
 
-# 6. Закрытие задачи
-tracker task close ACME-1 --solution "Исправлено"
+# 6. Пауза/возобновление с кастомным временем
+tracker pause ACME-15 --at "14:30"
+tracker resume ACME-15 --start "15:00"
+
+# 7. Закрытие задачи
+tracker task close ACME-15 --solution "Исправлено"
 ```
 
-## Основные команды
+## Конфигурация
 
-### Авторизация
+Файлы хранятся в `~/.tracker/`:
 
-| Команда | Описание |
-|---------|----------|
-| `tracker login` | Вход в систему (password или AD) |
-| `tracker logout` | Выход из системы |
-| `tracker me` | Информация о текущем пользователе |
-| `tracker register` | Регистрация нового пользователя |
+| Файл | Описание |
+|------|----------|
+| `servers.json` | Серверы и токены авторизации |
+| `aliases.json` | Алиасы команд |
+| `update-check.json` | Кэш проверок обновлений |
+| `export-presets.yaml` | Пресеты экспорта |
+
+### Управление серверами
+
+```bash
+tracker server add work https://tracker.example.com
+tracker server list
+tracker server use work
+tracker server remove work
+```
+
+### Дефолтная компания
+
+```bash
+tracker config default-company ACME
+tracker config show
+```
+
+## Команды
 
 ### Задачи
 
-| Команда | Описание |
-|---------|----------|
-| `tracker task add [название]` | Создать задачу |
-| `tracker task list` | Список задач с фильтрацией |
-| `tracker task view [тикет]` | Подробная информация о задаче |
-| `tracker task edit [тикет]` | Редактировать задачу |
-| `tracker task close [тикет]` | Закрыть задачу |
-| `tracker task pause [тикет]` | Поставить на паузу |
-| `tracker task resume [тикет]` | Возобновить задачу |
-| `tracker task assign [тикет] [user]` | Назначить исполнителя |
-| `tracker task delete [тикет]` | Удалить задачу |
-
-**Примеры:**
-
 ```bash
-# Создать задачу с указанием компании и исполнителя
-tracker task add "Рефакторинг модуля" --company ACME --assignee ivanov
+# Создание
+tracker task add "Название задачи" [флаги]
+  -s, --start string      Начало (по умолчанию: now)
+  -e, --end string        Конец
+  -q, --company string    Компания (по умолчанию — из конфига)
+  -a, --assignee string   Исполнитель
+  -S, --solution string   Статус
+  -C, --comment string    Комментарий
+  -T, --tag strings       Теги (можно указать несколько)
 
-# Список задач за сегодня
-tracker task list --today
+# Из шаблона
+tracker task from <имя_шаблона> [флаги]
+  -t, --title string      Переопределить название
+  -s, --start string      Начало
+  -q, --company string    Переопределить компанию
+  -T, --tag strings       Дополнительные теги
 
-# Список задач за неделю с фильтром по компании
-tracker task list --week --company ACME
+# Список
+tracker task list [флаги]
+  -t, --today             Только сегодня
+  -w, --week              За неделю
+  -m, --month             За месяц
+  -q, --company string    Фильтр по компании
+  -S, --solution string   Фильтр по статусу
+  -a, --assignee string   Фильтр по исполнителю
+  -s, --search string     Поиск
+  -C, --search-comments   Искать также в комментариях
+  -T, --tag strings       Фильтр по тегам
+  -A, --all               Показать все задачи
+  -p, --page int          Номер страницы
+  -l, --limit int         Количество задач на странице
+  -o, --offset int        Смещение от начала
 
-# Пагинация
-tracker task list --page 2 --limit 20
+# Просмотр
+tracker task view <тикет>
+  -N, --no-comments       Не показывать комментарии
 
-# Фильтрация по тегам
-tracker task list --tag backend --tag urgent
+# Редактирование
+tracker task edit <тикет> [флаги]
+  -t, --title string      Новое название
+  -s, --start string      Новое время начала
+  -e, --end string        Новое время окончания
+  -q, --company string    Новая компания
+  -a, --assignee string   Новый исполнитель
+  -S, --solution string   Новый статус
+  -C, --comment string    Новый комментарий
+  -T, --tag strings       Новые теги (полная замена)
 
-# Показать все задачи без пагинации
-tracker task list --all
+# Жизненный цикл
+tracker task close <тикет> [-s, --solution string]
+tracker task pause <тикет> [-t, --at string]
+tracker task resume <тикет> [-s, --start string]
+tracker task assign <тикет> <исполнитель>
+tracker task delete <тикет>
+
+# Bulk-операции
+tracker task bulk close <тикет1> <тикет2> ...
+tracker task bulk assign <исполнитель> <тикет1> <тикет2> ...
+tracker task bulk delete <тикет1> <тикет2> ... [-f, --force]
+
+# Экспорт
+tracker task export [флаги]
+  -f, --format string     Формат: csv, json, xlsx
+  -o, --output string     Имя выходного файла
+  -p, --period string     Относительный период
+  -D, --date-from string  Дата начала
+  -T, --date-to string    Дата конца
+  -i, --interactive       Интерактивный режим
+  -r, --preset string     Имя пресета
 ```
 
 ### Комментарии
 
-| Команда | Описание |
-|---------|----------|
-| `tracker task comment list [тикет]` | Список комментариев |
-| `tracker task comment add [тикет] [текст]` | Добавить комментарий |
-| `tracker task comment edit [тикет] [id]` | Редактировать комментарий |
-| `tracker task comment delete [тикет] [id]` | Удалить комментарий |
-| `tracker task comment watch [тикет]` | Следить за новыми комментариями |
-
-**Примеры:**
-
 ```bash
-# Короткий комментарий
-tracker task comment add ACME-1 "Задача выполнена"
+tracker task comment list <тикет> [флаги]
+  -a, --all               Показать все комментарии
+  -p, --page int          Номер страницы
+  -l, --limit int         Количество на странице
 
-# Через редактор (для длинных комментариев с Markdown)
-tracker task comment add ACME-1 --editor
+tracker task comment add <тикет> [флаги]
+  --editor                Открыть в редакторе
+  --file string           Прочитать из файла
+  -i, --interactive       Интерактивный режим
 
-# Из файла
-tracker task comment add ACME-1 --file report.md
-
-# Интерактивный режим
-tracker task comment add ACME-1 --interactive
-
-# Слежение за новыми комментариями (Ctrl+C для остановки)
-tracker task comment watch ACME-1 --interval 10s
+tracker task comment edit <id> <новый текст>
+tracker task comment delete <id>
+tracker task comment watch <тикет>   # Polling новых комментариев
 ```
-
-**Поддерживаемый Markdown:**
-
-- `**жирный**`, `*курсив*`, `` `код` ``
-- Списки, заголовки, ссылки
-- Блоки кода с подсветкой языка
-- Упоминания `@username`
 
 ### Теги
 
-| Команда | Описание |
-|---------|----------|
-| `tracker tag add [тикет] [теги...]` | Добавить теги к задаче |
-| `tracker tag remove [тикет] [теги...]` | Удалить теги |
-| `tracker tag list` | Список всех тегов |
-| `tracker tag show [тикет]` | Теги конкретной задачи |
-
-**Примеры:**
-
 ```bash
-tracker tag add ACME-1 backend refactoring urgent
-tracker tag remove ACME-1 urgent
-tracker tag list
-tracker task list --tag backend
+tracker tag add <имя> [-c, --color string]   # Цвет опционален (#RRGGBB)
+tracker tag list [-s, --search string]
+tracker tag update <id> [-n, --name string] [-c, --color string]
+tracker tag delete <id> [-f, --force]
+```
+
+Примеры:
+```bash
+tracker tag add bug --color "#FF5733"
+tracker tag add urgent
+tracker tag add golang -c "#00add8"
+tracker task add "Исправить баг" --tag bug --tag urgent
+tracker task list --tag bug --tag urgent
 ```
 
 ### Шаблоны
 
-| Команда | Описание |
-|---------|----------|
-| `tracker template add [имя]` | Создать шаблон (откроется редактор) |
-| `tracker template list` | Список шаблонов |
-| `tracker template show [имя]` | Содержимое шаблона |
-| `tracker template edit [имя]` | Редактировать шаблон |
-| `tracker template remove [имя]` | Удалить шаблон |
-| `tracker task from [шаблон]` | Создать задачу из шаблона |
+```bash
+tracker template add <имя> [флаги]
+  -t, --title string      Заголовок задачи (обязательный)
+  -d, --description string Описание
+  -c, --company string    Компания
+  -s, --solution string   Статус по умолчанию
+  -p, --public            Публичный шаблон
 
-**Пример YAML-шаблона** (`~/.tracker/templates/daily.yaml`):
-
-```yaml
-name: daily-standup
-title: "Ежедневная планёрка"
-company: ACME
-comment: "Регулярная встреча команды"
-tags:
-  - meeting
-  - daily
+tracker template list [-a, --all]           # --all только для admin
+tracker template show <id>
+tracker template use <id>                   # Создать задачу из шаблона
+tracker template delete <id> [-f, --force]
 ```
 
-Использование:
+### Авторизация
 
 ```bash
-tracker task from daily-standup
-tracker task from daily-standup --title "Планёрка по проекту X"
-```
+tracker login [-u, --username string] [-m, --method string]
+  -u, --username string   Имя пользователя (пропустить ввод)
+  -m, --method string     Метод: password, ad
 
-### Экспорт
-
-| Команда | Описание |
-|---------|----------|
-| `tracker task export` | Экспорт задач в файл |
-| `tracker export preset save [имя]` | Сохранить пресет экспорта |
-| `tracker export preset list` | Список пресетов |
-| `tracker export preset remove [имя]` | Удалить пресет |
-
-**Примеры:**
-
-```bash
-# Базовый экспорт
-tracker task export --format csv --output tasks.csv
-
-# С пресетом
-tracker task export --preset monthly
-
-# С относительным периодом
-tracker task export --format xlsx --period "last month"
-
-# Preview перед экспортом
-tracker task export --format csv --preview --today
-
-# Интерактивный режим
-tracker task export --interactive
-
-# С выбором колонок
-tracker task export --format csv --fields ticket,title,hours --today
-
-# Сложный фильтр
-tracker task export --format xlsx \
-  --period "last 7 days" \
-  --company ACME \
-  --open-only \
-  --all-users \
-  --timezone Europe/Moscow
-```
-
-**Поддерживаемые периоды:**
-
-- `today`, `yesterday`, `tomorrow`
-- `this week`, `last week`, `next week`
-- `this month`, `last month`, `next month`
-- `this quarter`, `last quarter`
-- `this year`, `last year`
-- `last 7 days`, `last 30 days`
-- `last monday`, `next friday`
-
-### Алиасы
-
-| Команда | Описание |
-|---------|----------|
-| `tracker alias add [имя] [команда]` | Создать алиас |
-| `tracker alias list` | Список алиасов |
-| `tracker alias remove [имя]` | Удалить алиас |
-
-**Примеры:**
-
-```bash
-tracker alias add ll "task list --today"
-tracker alias add w "task list --week"
-tracker alias add st "task list"
-
-# Использование
-tracker ll
-tracker w
+tracker logout
+tracker me
+tracker register
 ```
 
 ### Компании
 
-| Команда | Описание |
-|---------|----------|
-| `tracker company list` | Список компаний |
-| `tracker company add [название]` | Добавить компанию (admin) |
-| `tracker company delete [название]` | Удалить компанию (admin) |
+```bash
+tracker company add <название> [-d, --description string]
+tracker company list [-a, --all] [-p, --page int] [-l, --limit int]
+tracker company delete <название>
+```
 
-### Конфигурация
+### Алиасы
 
-| Команда | Описание |
-|---------|----------|
-| `tracker configure` | Настроить подключение к API |
-| `tracker server add [имя] [url]` | Добавить сервер |
-| `tracker server list` | Список серверов |
-| `tracker server use [имя]` | Переключиться на сервер |
-| `tracker server remove [имя]` | Удалить сервер |
-| `tracker config default-company [название]` | Компания по умолчанию |
-| `tracker config show` | Показать конфигурацию |
+```bash
+tracker alias add <имя> <команда>
+tracker alias list
+tracker alias remove <имя>
+```
+
+### Пресеты экспорта
+
+```bash
+tracker export preset save <имя> [флаги]
+tracker export preset list
+tracker export preset show <имя>
+tracker export preset remove <имя>
+```
 
 ### Обновление
 
-| Команда | Описание |
-|---------|----------|
-| `tracker update` | Проверить и установить обновление |
-| `tracker update --check` | Только проверить наличие обновления |
-| `tracker update --pre-release` | Включая pre-release версии |
-| `tracker --version` | Показать текущую версию |
+```bash
+tracker update                  # Обновить до последней версии
+tracker update --check          # Только проверить
+tracker update --pre-release    # Включая pre-release
+```
 
-Уведомление о новой версии показывается автоматически при запуске (не чаще раза в сутки). Отключить:
+## Примеры использования
+
+### Работа с тегами
 
 ```bash
-export TRACKER_NO_UPDATE_CHECK=1
+# Создание тегов с цветами
+tracker tag add bug --color "#FF5733"
+tracker tag add urgent -c "#C70039"
+tracker tag add golang -c "#00add8"
+
+# Привязка тегов к задаче
+tracker task add "Оптимизация запроса" --tag golang --tag urgent
+
+# Фильтрация по тегам (OR-логика)
+tracker task list --tag bug --tag urgent
+
+# Обновление тегов задачи (полная замена)
+tracker task edit ACME-15 --tag critical-bug --tag urgent
+
+# Очистка всех тегов
+tracker task edit ACME-15 --tag
 ```
 
-## Глобальные флаги
+### Bulk-операции
 
-| Флаг | Описание |
-|------|----------|
-| `--help`, `-h` | Справка |
-| `--version`, `-v` | Версия |
-| `--install` | Установить в систему (добавить в PATH) |
-| `--uninstall` | Удалить из системы |
+```bash
+# Массовое закрытие
+tracker task bulk close ACME-15 ACME-16 ACME-17
 
-## Структура файлов
+# Массовое назначение
+tracker task bulk assign ivanov ACME-20 ACME-21 ACME-22
 
+# Массовое удаление с подтверждением
+tracker task bulk delete ACME-99 ACME-100
+tracker task bulk delete --force ACME-99 ACME-100
 ```
-~/.tracker/
-├── servers.json          # Конфигурация серверов и токены
-├── aliases.json          # Алиасы команд
-├── tags.json             # Теги задач (локально, по серверам)
-├── update-check.json     # Кэш проверки обновлений
-── export-presets.yaml   # Пресеты экспорта
-└── templates/            # Шаблоны задач (YAML)
-    ├── daily.yaml
-    └── meeting.yaml
+
+### Поиск
+
+```bash
+# Поиск по названию и комментарию задачи
+tracker task list --search "авторизации"
+
+# Поиск также в комментариях
+tracker task list --search "авторизации" --search-comments
+tracker task list -s "авторизации" -C
+```
+
+### Кастомные времена
+
+```bash
+# Пауза с указанием времени
+tracker pause ACME-15 --at "14:30"
+tracker pause ACME-15 -t "2026-07-01T14:30:00"
+
+# Возобновление с указанием времени
+tracker resume ACME-15 --start "15:00"
+tracker resume ACME-15 -s "2026-07-01T15:00:00"
+```
+
+### Экспорт
+
+```bash
+# Экспорт за сегодня в CSV
+tracker task export --format csv --period today
+
+# Экспорт за последнюю неделю в XLSX
+tracker task export -f xlsx -p "last 7 days"
+
+# Экспорт с пресетом
+tracker export preset save weekly --format xlsx --period "this week"
+tracker task export --preset weekly
+
+# Интерактивный режим
+tracker task export --interactive
 ```
 
 ## Разработка
@@ -342,54 +355,45 @@ export TRACKER_NO_UPDATE_CHECK=1
 ### Сборка
 
 ```bash
-# Локальная сборка
-make build
-
-# Кроссплатформенная сборка
-make build-all
-
-# Запуск тестов
-make test
-
-# Очистка
-make clean
+make build              # Локальная сборка
+make build-all          # Кроссплатформенная + checksums
 ```
 
-### Создание релиза
+### Тесты
+
+```bash
+make test               # go test ./...
+```
+
+### Релиз
 
 ```bash
 git tag -a v1.5.0 -m "Release v1.5.0"
-git push origin v1.5.0
+git push origin v1.5.0  # Запустит GitHub Actions
 ```
 
-GitHub Actions автоматически соберёт бинарники для всех платформ и создаст релиз.
+### Локальная проверка обновления
 
-### Структура проекта
+```bash
+./build/tracker update --check
+./build/tracker update --pre-release
+```
 
+### Отключение проверки обновлений
+
+```bash
+export TRACKER_NO_UPDATE_CHECK=1
 ```
-tracker-cli/
-├── cmd/tracker/main.go        # Точка входа
-├── internal/
-│   ├── cli/                   # CLI-команды (cobra)
-│   │   ├── task/              # Подкоманды task
-│   │   │   ├── comment/       # Подкоманды comment
-│   │   │   └── ...
-│   │   ── ...
-│   ├── client/                # HTTP-клиент для API
-│   ├── config/                # Работа с конфигом
-│   ├── models/                # Модели данных
-│   ├── service/               # Бизнес-логика
-│   ├── ui/                    # Цветной вывод в терминал
-│   ├── updater/               # Автообновление
-│   ├── version/               # Версия (встраивается при сборке)
-│   ── installer/             # Установка в систему
-├── pkg/                       # Переиспользуемые пакеты
-│   ├── table/                 # Таблицы
-│   └── timeparse/             # Парсинг времени
-── Makefile
-└── README.md
-```
+
+## Зависимости
+
+- `github.com/fatih/color` — цветовая разметка
+- `github.com/jedib0t/go-pretty/v6` — таблицы
+- `github.com/spf13/cobra` — CLI-фреймворк
+- `github.com/charmbracelet/glamour` — рендеринг Markdown
+- `golang.org/x/term` — работа с терминалом
+- `gopkg.in/yaml.v3` — YAML-парсинг
 
 ## Лицензия
 
-MIT License. См. файл [LICENSE](LICENSE) для подробностей.
+MIT
