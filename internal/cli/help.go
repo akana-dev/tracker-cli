@@ -38,15 +38,22 @@ type commandGroup struct {
 var groupsConfig = map[string][]commandGroup{
 	"tracker": {
 		{"Авторизация:", []string{"login", "logout", "me", "register"}},
-		{"Конфигурация:", []string{"configure", "server"}},
-		{"Работа с данными:", []string{"task", "company"}},
-		{"Администрирование:", []string{"users", "role"}},
+		{"Конфигурация:", []string{"configure", "server", "config"}},
+		{"Работа с задачами:", []string{"task", "company"}},
+		{"Быстрые команды:", []string{"start", "stop", "status", "paused"}},
+		{"Теги и шаблоны:", []string{"tag", "template"}},
+		{"Экспорт:", []string{"export"}},
+		{"Настройки:", []string{"alias"}},
+		{"Администрирование:", []string{"users"}},
+		{"Служебные:", []string{"update"}},
 	},
 	"task": {
-		{"Создание:", []string{"add"}},
+		{"Создание:", []string{"add", "from"}},
 		{"Просмотр:", []string{"list", "view", "export"}},
-		{"Редактирование:", []string{"edit", "assign", "close"}},
-		{"Управление состоянием:", []string{"pause", "resume", "delete"}},
+		{"Редактирование:", []string{"edit", "assign"}},
+		{"Жизненный цикл:", []string{"pause", "resume", "close", "delete"}},
+		{"Массовые операции:", []string{"bulk"}},
+		{"Комментарии:", []string{"comment"}},
 	},
 }
 

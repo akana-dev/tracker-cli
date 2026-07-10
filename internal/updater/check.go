@@ -75,16 +75,17 @@ func CheckForUpdate(ctx context.Context, owner, repo string, includePreRelease b
 	}
 
 	latestVersion := release.TagName
-	if len(latestVersion) > 0 && latestVersion[0] == 'v' {
-		latestVersion = latestVersion[1:]
-	}
 
-	hasUpdate := compareSemver(latestVersion, currentVersion) > 0
-	downloadURL := findAssetForPlatform(release.Assets)
+	hasUpdate := compareSemverWithSuffix(latestVersion, currentVersion) > 0
+
+	downloadURL, err := findAssetForPlatform(release.Assets)
+	if err != nil {
+		downloadURL = ""
+	}
 
 	return &CheckResult{
 		HasUpdate:      hasUpdate,
-		LatestVersion:  latestVersion,
+		LatestVersion:  strings.TrimPrefix(latestVersion, "v"),
 		CurrentVersion: currentVersion,
 		ReleaseURL:     release.HtmlURL,
 		Changelog:      release.Body,
@@ -122,7 +123,7 @@ func getLatestStableRelease(ctx context.Context, owner, repo string) (GitHubRele
 }
 
 func getLatestReleaseIncludingPreRelease(ctx context.Context, owner, repo string) (GitHubRelease, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases?per_page=1", owner, repo)
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases?per_page=10", owner, repo)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -151,10 +152,17 @@ func getLatestReleaseIncludingPreRelease(ctx context.Context, owner, repo string
 		return GitHubRelease{}, fmt.Errorf("релизы не найдены")
 	}
 
-	return releases[0], nil
+	latest := releases[0]
+	for _, release := range releases[1:] {
+		if isMoreRecent(release, latest) {
+			latest = release
+		}
+	}
+
+	return latest, nil
 }
 
-func findAssetForPlatform(assets []GitHubAsset) string {
+func findAssetForPlatform(assets []GitHubAsset) (string, error) {
 	targetOS := runtime.GOOS
 	targetArch := runtime.GOARCH
 
@@ -167,19 +175,33 @@ func findAssetForPlatform(assets []GitHubAsset) string {
 
 	for _, asset := range assets {
 		if asset.Name == targetName {
-			return asset.BrowserDownloadURL
+			return asset.BrowserDownloadURL, nil
 		}
 	}
 
-	return ""
+	return "", fmt.Errorf("бинарник для %s/%s не найден в релизе (ожидался: %s)", targetOS, targetArch, targetName)
+}
+
+func isMoreRecent(release, current GitHubRelease) bool {
+	v1 := strings.TrimPrefix(release.TagName, "v")
+	v2 := strings.TrimPrefix(current.TagName, "v")
+
+	return compareSemverWithSuffix(v1, v2) > 0
 }
 
 func compareSemver(v1, v2 string) int {
+	return compareSemverWithSuffix(v1, v2)
+}
+
+func compareSemverWithSuffix(v1, v2 string) int {
 	v1 = strings.TrimPrefix(v1, "v")
 	v2 = strings.TrimPrefix(v2, "v")
 
-	parts1 := strings.Split(v1, ".")
-	parts2 := strings.Split(v2, ".")
+	base1, suffix1 := splitVersionAndSuffix(v1)
+	base2, suffix2 := splitVersionAndSuffix(v2)
+
+	parts1 := strings.Split(base1, ".")
+	parts2 := strings.Split(base2, ".")
 
 	maxLen := len(parts1)
 	if len(parts2) > maxLen {
@@ -203,5 +225,29 @@ func compareSemver(v1, v2 string) int {
 		}
 	}
 
+	if suffix1 == "" && suffix2 == "" {
+		return 0
+	}
+	if suffix1 == "" && suffix2 != "" {
+		return 1
+	}
+	if suffix1 != "" && suffix2 == "" {
+		return -1
+	}
+
+	if suffix1 < suffix2 {
+		return -1
+	}
+	if suffix1 > suffix2 {
+		return 1
+	}
 	return 0
+}
+
+func splitVersionAndSuffix(version string) (string, string) {
+	parts := strings.SplitN(version, "-", 2)
+	if len(parts) == 1 {
+		return parts[0], ""
+	}
+	return parts[0], parts[1]
 }

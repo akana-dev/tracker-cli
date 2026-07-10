@@ -2,12 +2,17 @@ package task
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"tracker/internal/client"
+	"tracker/internal/input"
 	"tracker/internal/ui"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
+
+const maxBulkTasks = 100
 
 var BulkCmd = &cobra.Command{
 	Use:   "bulk",
@@ -19,6 +24,10 @@ var bulkCloseCmd = &cobra.Command{
 	Short: "Массовое закрытие задач",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) > maxBulkTasks {
+			return fmt.Errorf("слишком много задач: %d (максимум %d)", len(args), maxBulkTasks)
+		}
+
 		var taskIDs []int
 		var errors []string
 
@@ -42,10 +51,10 @@ var bulkCloseCmd = &cobra.Command{
 
 		fmt.Println(ui.Checkmark(), ui.Successf("Обработано задач: %d", result.Total))
 		if result.Succeeded > 0 {
-			fmt.Println(ui.Success, ui.Successf("  ✓ Успешно закрыто: %d", result.Succeeded))
+			fmt.Println(ui.Successf("  Успешно закрыто: %d", result.Succeeded))
 		}
 		if result.Failed > 0 {
-			fmt.Println(ui.Warning, ui.Warningf("  ⚠ Ошибок: %d", result.Failed))
+			fmt.Println(ui.Warningf("  Ошибок: %d", result.Failed))
 			for _, r := range result.Results {
 				if r.Status == "error" || r.Status == "skipped" {
 					fmt.Printf("    - Задача #%d: %s\n", r.TaskID, r.Detail)
@@ -54,7 +63,7 @@ var bulkCloseCmd = &cobra.Command{
 		}
 
 		if len(errors) > 0 {
-			fmt.Println(ui.Warning, ui.Warning("Ошибки поиска задач:"))
+			fmt.Println(ui.Warning("Ошибки поиска задач:"))
 			for _, e := range errors {
 				fmt.Printf("  - %s\n", e)
 			}
@@ -71,6 +80,10 @@ var bulkAssignCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		assignee := args[0]
 		tickets := args[1:]
+
+		if len(tickets) > maxBulkTasks {
+			return fmt.Errorf("слишком много задач: %d (максимум %d)", len(tickets), maxBulkTasks)
+		}
 
 		var taskIDs []int
 		var errors []string
@@ -95,10 +108,10 @@ var bulkAssignCmd = &cobra.Command{
 
 		fmt.Println(ui.Checkmark(), ui.Successf("Обработано задач: %d", result.Total))
 		if result.Succeeded > 0 {
-			fmt.Println(ui.Success, ui.Successf("  ✓ Успешно назначено: %d", result.Succeeded))
+			fmt.Println(ui.Successf("  Успешно назначено: %d", result.Succeeded))
 		}
 		if result.Failed > 0 {
-			fmt.Println(ui.Warning, ui.Warningf("  ⚠ Ошибок: %d", result.Failed))
+			fmt.Println(ui.Warningf("  Ошибок: %d", result.Failed))
 			for _, r := range result.Results {
 				if r.Status == "error" || r.Status == "skipped" {
 					fmt.Printf("    - Задача #%d: %s\n", r.TaskID, r.Detail)
@@ -107,7 +120,7 @@ var bulkAssignCmd = &cobra.Command{
 		}
 
 		if len(errors) > 0 {
-			fmt.Println(ui.Warning, ui.Warning("Ошибки поиска задач:"))
+			fmt.Println(ui.Warning("Ошибки поиска задач:"))
 			for _, e := range errors {
 				fmt.Printf("  - %s\n", e)
 			}
@@ -122,13 +135,22 @@ var bulkDeleteCmd = &cobra.Command{
 	Short: "Массовое удаление задач",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) > maxBulkTasks {
+			return fmt.Errorf("слишком много задач: %d (максимум %d)", len(args), maxBulkTasks)
+		}
+
 		force, _ := cmd.Flags().GetBool("force")
 
 		if !force {
-			fmt.Printf(ui.Warning("Вы действительно хотите удалить %d задач? [y/N]: "), len(args))
-			var confirm string
-			fmt.Scanln(&confirm)
-			if strings.ToLower(confirm) != "y" {
+			if !term.IsTerminal(int(os.Stdin.Fd())) {
+				return fmt.Errorf("массовое удаление требует интерактивного терминала или флага --force")
+			}
+
+			prompt := fmt.Sprintf("Вы действительно хотите удалить %d задач?", len(args))
+			confirmed := input.ReadBool(prompt, false)
+
+			if !confirmed {
+				fmt.Println(ui.Dim("Отменено"))
 				return nil
 			}
 		}
@@ -140,6 +162,11 @@ var bulkDeleteCmd = &cobra.Command{
 			task, err := client.GetTaskByTicket(strings.ToUpper(ticket))
 			if err != nil {
 				errors = append(errors, fmt.Sprintf("%s: %v", ticket, err))
+				continue
+			}
+
+			if !task.CanDelete {
+				errors = append(errors, fmt.Sprintf("%s: нет прав на удаление", ticket))
 				continue
 			}
 			taskIDs = append(taskIDs, task.ID)
@@ -156,10 +183,10 @@ var bulkDeleteCmd = &cobra.Command{
 
 		fmt.Println(ui.Checkmark(), ui.Successf("Обработано задач: %d", result.Total))
 		if result.Succeeded > 0 {
-			fmt.Println(ui.Success, ui.Successf("  ✓ Успешно удалено: %d", result.Succeeded))
+			fmt.Println(ui.Successf("  Успешно удалено: %d", result.Succeeded))
 		}
 		if result.Failed > 0 {
-			fmt.Println(ui.Warning, ui.Warningf("  ⚠ Ошибок: %d", result.Failed))
+			fmt.Println(ui.Warningf("  Ошибок: %d", result.Failed))
 			for _, r := range result.Results {
 				if r.Status == "error" || r.Status == "skipped" {
 					fmt.Printf("    - Задача #%d: %s\n", r.TaskID, r.Detail)
@@ -168,7 +195,7 @@ var bulkDeleteCmd = &cobra.Command{
 		}
 
 		if len(errors) > 0 {
-			fmt.Println(ui.Warning, ui.Warning("Ошибки поиска задач:"))
+			fmt.Println(ui.Warning("Ошибки поиска задач:"))
 			for _, e := range errors {
 				fmt.Printf("  - %s\n", e)
 			}

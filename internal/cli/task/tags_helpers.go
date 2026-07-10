@@ -3,18 +3,51 @@ package task
 import (
 	"fmt"
 	"strings"
+	"sync"
+	"time"
 
 	"tracker/internal/client"
+	"tracker/internal/models"
 )
+
+var tagCache struct {
+	sync.RWMutex
+	tags   []models.Tag
+	expire time.Time
+}
+
+const tagCacheTTL = 5 * time.Minute
+
+func getTagsFromCache() ([]models.Tag, error) {
+	tagCache.RLock()
+	if time.Now().Before(tagCache.expire) && len(tagCache.tags) > 0 {
+		tags := tagCache.tags
+		tagCache.RUnlock()
+		return tags, nil
+	}
+	tagCache.RUnlock()
+
+	tags, err := client.ListTags("")
+	if err != nil {
+		return nil, fmt.Errorf("не удалось получить список тегов: %w", err)
+	}
+
+	tagCache.Lock()
+	tagCache.tags = tags
+	tagCache.expire = time.Now().Add(tagCacheTTL)
+	tagCache.Unlock()
+
+	return tags, nil
+}
 
 func resolveTagNamesToIDs(names []string) ([]int, error) {
 	if len(names) == 0 {
 		return nil, nil
 	}
 
-	allTags, err := client.ListTags("")
+	allTags, err := getTagsFromCache()
 	if err != nil {
-		return nil, fmt.Errorf("не удалось получить список тегов: %w", err)
+		return nil, err
 	}
 
 	tagMap := make(map[string]int, len(allTags))
@@ -36,4 +69,11 @@ func resolveTagNamesToIDs(names []string) ([]int, error) {
 	}
 
 	return ids, nil
+}
+
+func ClearTagCache() {
+	tagCache.Lock()
+	tagCache.tags = nil
+	tagCache.expire = time.Time{}
+	tagCache.Unlock()
 }

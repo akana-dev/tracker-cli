@@ -26,6 +26,8 @@ var reservedNames = map[string]bool{
 	"register": true, "configure": true, "server": true, "task": true,
 	"company": true, "help": true, "completion": true, "alias": true,
 	"tag": true, "template": true, "config": true,
+	"start": true, "stop": true, "status": true, "paused": true,
+	"update": true, "export": true,
 }
 
 func init() {

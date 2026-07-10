@@ -1,6 +1,9 @@
 package models
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 type User struct {
 	ID        int          `json:"id"`
@@ -48,6 +51,28 @@ type Task struct {
 	CanDelete          bool          `json:"can_delete"`
 	Comments           []Comment     `json:"comments,omitempty"`
 	Tags               []Tag         `json:"tags,omitempty"`
+}
+
+func (t *Task) UnmarshalJSON(data []byte) error {
+	type Alias Task
+	aux := &struct {
+		*Alias
+	}{
+		Alias: (*Alias)(t),
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	if t.Tags == nil {
+		t.Tags = []Tag{}
+	}
+	if t.Comments == nil {
+		t.Comments = []Comment{}
+	}
+	if t.Sessions == nil {
+		t.Sessions = []TaskSession{}
+	}
+	return nil
 }
 
 func (t *Task) GetAssigneeDisplay() string {
@@ -199,26 +224,19 @@ func (r *CompanyListResponse) HasPrev() bool {
 }
 
 type Template struct {
-	// Name — имя шаблона (используется как идентификатор, не хранится в YAML)
-	Name string `yaml:"-" json:"name"`
-
-	// Title — название задачи (обязательное поле)
-	Title string `yaml:"title" json:"title"`
-
-	// Company — название компании (опционально)
-	Company string `yaml:"company,omitempty" json:"company,omitempty"`
-
-	// Assignee — исполнитель (опционально)
-	Assignee string `yaml:"assignee,omitempty" json:"assignee,omitempty"`
-
-	// Solution — статус решения по умолчанию (опционально)
-	Solution string `yaml:"solution,omitempty" json:"solution,omitempty"`
-
-	// Comment — комментарий по умолчанию (опционально)
-	Comment string `yaml:"comment,omitempty" json:"comment,omitempty"`
-
-	// Tags — список тегов (опционально)
-	Tags []Tag `json:"tags,omitempty"`
+	ID              int    `json:"id"`
+	Name            string `json:"name"`
+	Title           string `json:"title"`
+	Description     string `json:"description,omitempty"`
+	CompanyName     string `json:"company_name,omitempty"`
+	DefaultSolution string `json:"default_solution,omitempty"`
+	IsPublic        bool   `json:"is_public"`
+	OwnerID         int    `json:"owner_id"`
+	OwnerUsername   string `json:"owner_username"`
+	CreatedAt       string `json:"created_at"`
+	UpdatedAt       string `json:"updated_at,omitempty"`
+	CanEdit         bool   `json:"can_edit"`
+	CanDelete       bool   `json:"can_delete"`
 }
 
 type Comment struct {

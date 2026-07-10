@@ -2,12 +2,14 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"strconv"
-	"strings"
 	"tracker/internal/client"
+	"tracker/internal/input"
 	"tracker/internal/ui"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 var templateCmd = &cobra.Command{
@@ -78,21 +80,9 @@ var templateShowCmd = &cobra.Command{
 			return fmt.Errorf("некорректный ID: %s", args[0])
 		}
 
-		templates, err := client.ListTemplates(true)
+		template, err := client.GetTemplateByID(id)
 		if err != nil {
-			return err
-		}
-
-		var template *client.Template
-		for _, t := range templates {
-			if t.ID == id {
-				template = &t
-				break
-			}
-		}
-
-		if template == nil {
-			return fmt.Errorf("шаблон #%d не найден", id)
+			return fmt.Errorf("шаблон #%d не найден: %w", id, err)
 		}
 
 		fmt.Println(ui.Bold("ID:"), template.ID)
@@ -146,10 +136,13 @@ var templateDeleteCmd = &cobra.Command{
 
 		force, _ := cmd.Flags().GetBool("force")
 		if !force {
-			fmt.Print(ui.Warning("Удалить шаблон? [y/N]: "))
-			var confirm string
-			fmt.Scanln(&confirm)
-			if strings.ToLower(confirm) != "y" {
+			if !term.IsTerminal(int(os.Stdin.Fd())) {
+				return fmt.Errorf("удаление требует интерактивного терминала или флага --force")
+			}
+
+			confirmed := input.ReadBool("Удалить шаблон?", false)
+			if !confirmed {
+				fmt.Println(ui.Dim("Отменено"))
 				return nil
 			}
 		}

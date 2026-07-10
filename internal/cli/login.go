@@ -182,7 +182,6 @@ func init() {
 }
 
 func loginPassword(username string) error {
-	fmt.Print("Логин трекера: ")
 	if username == "" {
 		fmt.Print("Логин трекера: ")
 		username = readLine()

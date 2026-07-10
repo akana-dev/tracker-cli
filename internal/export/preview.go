@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"tracker/internal/client"
+	"tracker/internal/input"
 	"tracker/internal/service"
 	"tracker/internal/ui"
 	"tracker/pkg/table"
@@ -61,7 +62,7 @@ func RunPreview(params map[string]string, format string) error {
 	fmt.Println()
 
 	fmt.Print("Продолжить экспорт? [Y/n]: ")
-	answer := readLine()
+	answer := input.ReadLine()
 	answer = strings.ToLower(strings.TrimSpace(answer))
 	if answer == "n" || answer == "no" {
 		fmt.Println(ui.Warning("Экспорт отменён."))

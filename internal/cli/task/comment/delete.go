@@ -17,7 +17,7 @@ var DeleteCmd = &cobra.Command{
 	Long: `Удалить комментарий. Может удалить автор или admin.
 
 Примеры:
-  tracker comment delete NTC-7 42`,
+  tracker comment delete TEST-7 42`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ticket := strings.ToUpper(args[0])

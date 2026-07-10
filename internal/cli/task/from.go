@@ -10,7 +10,6 @@ import (
 	"tracker/internal/client"
 	"tracker/internal/config"
 	"tracker/internal/service"
-	"tracker/internal/templates"
 	"tracker/internal/ui"
 	"tracker/pkg/timeparse"
 )
@@ -22,7 +21,7 @@ var FromCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		templateName := args[0]
 
-		tmpl, err := templates.Load(templateName)
+		tmpl, err := client.GetTemplateByName(templateName)
 		if err != nil {
 			return fmt.Errorf("шаблон '%s' не найден: %w", templateName, err)
 		}
@@ -32,7 +31,7 @@ var FromCmd = &cobra.Command{
 			title = t
 		}
 
-		company := tmpl.Company
+		company := tmpl.CompanyName
 		if c, _ := cmd.Flags().GetString("company"); c != "" {
 			company = c
 		}
@@ -42,19 +41,21 @@ var FromCmd = &cobra.Command{
 			}
 		}
 
-		assignee := tmpl.Assignee
+		var assignee string
 		if a, _ := cmd.Flags().GetString("assignee"); a != "" {
 			assignee = a
 		}
 
-		solution := tmpl.Solution
+		solution := tmpl.DefaultSolution
 		if s, _ := cmd.Flags().GetString("solution"); s != "" {
 			solution = s
 		}
 
-		comment := tmpl.Comment
+		comment := ""
 		if c, _ := cmd.Flags().GetString("comment"); c != "" {
 			comment = c
+		} else if tmpl.Description != "" {
+			comment = tmpl.Description
 		}
 
 		if err := service.ValidateTitle(title); err != nil {
@@ -131,6 +132,6 @@ func init() {
 	FromCmd.Flags().StringP("company", "q", "", "Переопределить компанию")
 	FromCmd.Flags().StringP("assignee", "a", "", "Переопределить исполнителя")
 	FromCmd.Flags().StringP("solution", "S", "", "Переопределить статус")
-	FromCmd.Flags().StringP("comment", "C", "", "Переопределить комментарий")
+	FromCmd.Flags().StringP("comment", "C", "", "Переопределить комментарий (перезапишет description шаблона)")
 	FromCmd.Flags().StringSliceP("tag", "T", nil, "Дополнительные теги")
 }

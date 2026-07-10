@@ -80,16 +80,18 @@ var EditCmd = &cobra.Command{
 			changes = append(changes, "комментарий")
 		}
 
-		if cmd.Flags().Changed("tag") {
+		clearTags, _ := cmd.Flags().GetBool("clear-tags")
+		if clearTags {
+			payload["tag_ids"] = []int{}
+			changes = append(changes, "теги очищены")
+		} else if cmd.Flags().Changed("tag") {
 			tagNames, _ := cmd.Flags().GetStringSlice("tag")
-			tagIDs, err := resolveTagNamesToIDs(tagNames)
-			if err != nil {
-				return err
-			}
-			payload["tag_ids"] = tagIDs
-			if len(tagNames) == 0 {
-				changes = append(changes, "теги очищены")
-			} else {
+			if len(tagNames) > 0 {
+				tagIDs, err := resolveTagNamesToIDs(tagNames)
+				if err != nil {
+					return err
+				}
+				payload["tag_ids"] = tagIDs
 				changes = append(changes, fmt.Sprintf("теги=[%s]", strings.Join(tagNames, ", ")))
 			}
 		}
@@ -137,4 +139,5 @@ func init() {
 	EditCmd.Flags().StringP("solution", "S", "", "Новый статус")
 	EditCmd.Flags().StringP("comment", "C", "", "Новый комментарий")
 	EditCmd.Flags().StringSliceP("tag", "T", nil, "Новые теги задачи (полная замена)")
+	EditCmd.Flags().Bool("clear-tags", false, "Очистить все теги задачи")
 }

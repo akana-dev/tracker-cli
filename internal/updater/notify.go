@@ -46,8 +46,8 @@ func NotifyAboutUpdate(result *CheckResult) {
 	}
 
 	fmt.Printf("\n%s → %s (%s)\n",
-		ui.Dim(fmt.Sprintf("Доступна новая версия: %s", formatVersion(result.CurrentVersion))),
-		ui.Success(formatVersion(result.LatestVersion)),
+		ui.Dim(fmt.Sprintf("Доступна новая версия: %s", FormatVersion(result.CurrentVersion))),
+		ui.Success(FormatVersion(result.LatestVersion)),
 		ui.Dim("выполните: tracker update"),
 	)
 
@@ -62,8 +62,8 @@ func ShowFullUpdateInfo(result *CheckResult) {
 
 	fmt.Println()
 	fmt.Printf("Доступна новая версия: %s → %s\n",
-		ui.Dim(formatVersion(result.CurrentVersion)),
-		ui.Success(formatVersion(result.LatestVersion)))
+		ui.Dim(FormatVersion(result.CurrentVersion)),
+		ui.Success(FormatVersion(result.LatestVersion)))
 	fmt.Println()
 
 	if result.Changelog != "" {
@@ -90,7 +90,7 @@ func ShowFullUpdateInfo(result *CheckResult) {
 	fmt.Println()
 }
 
-func formatVersion(v string) string {
+func FormatVersion(v string) string {
 	if v == "dev" || v == "" {
 		return "dev"
 	}

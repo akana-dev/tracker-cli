@@ -37,7 +37,7 @@ var updateCmd = &cobra.Command{
 		}
 
 		if !result.HasUpdate {
-			fmt.Println(ui.Checkmark(), ui.Successf("У вас актуальная версия (%s)", formatVersion(result.CurrentVersion)))
+			fmt.Println(ui.Checkmark(), ui.Successf("У вас актуальная версия (%s)", updater.FormatVersion(result.CurrentVersion)))
 			return nil
 		}
 
@@ -61,21 +61,11 @@ var updateCmd = &cobra.Command{
 		}
 
 		fmt.Println()
-		fmt.Println(ui.Checkmark(), ui.Successf("Обновление до версии %s завершено!", formatVersion(targetVersion)))
+		fmt.Println(ui.Checkmark(), ui.Successf("Обновление до версии %s завершено!", updater.FormatVersion(targetVersion)))
 		fmt.Println(ui.Dim("Перезапустите tracker для использования новой версии."))
 
 		return nil
 	},
-}
-
-func formatVersion(v string) string {
-	if v == "dev" || v == "" {
-		return "dev"
-	}
-	if v[0] != 'v' {
-		return "v" + v
-	}
-	return v
 }
 
 func init() {

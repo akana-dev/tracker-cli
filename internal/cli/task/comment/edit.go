@@ -18,9 +18,9 @@ var EditCmd = &cobra.Command{
 	Long: `Редактировать свой комментарий. Только автор может редактировать.
 
 Примеры:
-  tracker comment edit NTC-7 42 "Новый текст"
-  tracker comment edit NTC-7 42 --editor
-  tracker comment edit NTC-7 42 --file new_content.md`,
+  tracker comment edit TEST-7 42 "Новый текст"
+  tracker comment edit TEST-7 42 --editor
+  tracker comment edit TEST-7 42 --file new_content.md`,
 	Args: cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ticket := strings.ToUpper(args[0])

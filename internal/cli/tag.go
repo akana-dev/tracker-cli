@@ -2,12 +2,14 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"strconv"
-	"strings"
 	"tracker/internal/client"
+	"tracker/internal/input"
 	"tracker/internal/ui"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 var tagCmd = &cobra.Command{
@@ -125,10 +127,13 @@ var tagDeleteCmd = &cobra.Command{
 
 		force, _ := cmd.Flags().GetBool("force")
 		if !force {
-			fmt.Print(ui.Warning("Удалить тег? Тег будет удалён из всех задач. [y/N]: "))
-			var confirm string
-			fmt.Scanln(&confirm)
-			if strings.ToLower(confirm) != "y" {
+			if !term.IsTerminal(int(os.Stdin.Fd())) {
+				return fmt.Errorf("удаление тега требует интерактивного терминала или флага --force")
+			}
+
+			confirmed := input.ReadBool("Удалить тег? Тег будет удалён из всех задач", false)
+			if !confirmed {
+				fmt.Println(ui.Dim("Отменено"))
 				return nil
 			}
 		}

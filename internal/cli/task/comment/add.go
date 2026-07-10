@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -20,10 +21,10 @@ var AddCmd = &cobra.Command{
 	Long: `Добавить комментарий к задаче. Поддерживает Markdown и упоминания @username.
 
 Примеры:
-  tracker comment add NTC-7 "Текст комментария"
-  tracker comment add NTC-7 --editor
-  tracker comment add NTC-7 --file comment.md
-  tracker comment add NTC-7 --interactive`,
+  tracker comment add TEST-7 "Текст комментария"
+  tracker comment add TEST-7 --editor
+  tracker comment add TEST-7 --file comment.md
+  tracker comment add TEST-7 --interactive`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ticket := strings.ToUpper(args[0])
@@ -81,7 +82,7 @@ func readInteractiveComment() (string, error) {
 	fmt.Println()
 	ui.Header("Интерактивный ввод комментария")
 	fmt.Println(ui.Dim("Поддерживается Markdown. Упоминания: @username"))
-	fmt.Println(ui.Dim("Введите комментарий. Для завершения — пустая строка."))
+	fmt.Println(ui.Dim("Введите комментарий. Для завершения — '.' на отдельной строке."))
 	fmt.Println()
 
 	var lines []string
@@ -89,7 +90,7 @@ func readInteractiveComment() (string, error) {
 		fmt.Print("> ")
 		line := input.ReadLine()
 
-		if line == "" && len(lines) > 0 {
+		if line == "." {
 			break
 		}
 
@@ -126,7 +127,11 @@ func readCommentFromEditor(initialContent string) (string, error) {
 
 	editor := os.Getenv("EDITOR")
 	if editor == "" {
-		editor = "nano"
+		if runtime.GOOS == "windows" {
+			editor = "notepad"
+		} else {
+			editor = "nano"
+		}
 	}
 
 	fmt.Println(ui.Dimf("Открываю редактор %s...", editor))

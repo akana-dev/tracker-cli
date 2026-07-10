@@ -21,9 +21,9 @@ var WatchCmd = &cobra.Command{
 	Long: `Периодически опрашивать API и показывать новые комментарии в реальном времени.
 
 Примеры:
-  tracker comment watch NTC-7
-  tracker comment watch NTC-7 --interval 10s
-  tracker comment watch NTC-7 --interval 1m
+  tracker comment watch TEST-7
+  tracker comment watch TEST-7 --interval 10s
+  tracker comment watch TEST-7 --interval 1m
 
 Для остановки — Ctrl+C`,
 	Args: cobra.ExactArgs(1),
@@ -40,7 +40,7 @@ var WatchCmd = &cobra.Command{
 		fmt.Println(ui.Dimf("Интервал: %s | Для остановки — Ctrl+C", interval))
 		fmt.Println()
 
-		comments, err := client.ListComments(task.ID, 500, 0)
+		comments, err := client.ListComments(task.ID, 100, 0)
 		if err != nil {
 			return err
 		}
@@ -77,7 +77,7 @@ var WatchCmd = &cobra.Command{
 			case <-ctx.Done():
 				return nil
 			case <-ticker.C:
-				newComments, err := client.ListComments(task.ID, 500, 0)
+				newComments, err := client.ListComments(task.ID, 100, 0)
 				if err != nil {
 					fmt.Println(ui.Warningf("Ошибка опроса: %v", err))
 					continue

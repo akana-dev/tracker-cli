@@ -12,12 +12,12 @@ var CommentCmd = &cobra.Command{
 Поддерживается Markdown и упоминания @username.
 
 Примеры:
-  tracker comment list NTC-7
-  tracker comment add NTC-7 "Текст комментария"
-  tracker comment add NTC-7 --editor
-  tracker comment edit NTC-7 42 "Новый текст"
-  tracker comment delete NTC-7 42
-  tracker comment watch NTC-7`,
+  tracker comment list TEST-7
+  tracker comment add TEST-7 "Текст комментария"
+  tracker comment add TEST-7 --editor
+  tracker comment edit TEST-7 42 "Новый текст"
+  tracker comment delete TEST-7 42
+  tracker comment watch TEST-7`,
 }
 
 func init() {

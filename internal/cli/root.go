@@ -27,6 +27,11 @@ var silentCommands = map[string]bool{
 	"register":  true,
 	"configure": true,
 
+	"start":  true,
+	"stop":   true,
+	"status": true,
+	"paused": true,
+
 	// Служебные команды
 	"help":       true,
 	"completion": true,
@@ -106,6 +111,7 @@ func isPublicCommand(cmd *cobra.Command) bool {
 		"server": true, "help": true, "completion": true,
 		"alias": true, "tag": true, "template": true, "config": true,
 		"export": true, "update": true,
+		"start": true, "stop": true, "status": true, "paused": true,
 	}
 
 	if publicCmds[cmd.Name()] {
@@ -167,4 +173,9 @@ func init() {
 	rootCmd.AddCommand(tagCmd)
 	rootCmd.AddCommand(templateCmd)
 	rootCmd.AddCommand(updateCmd)
+
+	rootCmd.AddCommand(StartCmd)
+	rootCmd.AddCommand(StopCmd)
+	rootCmd.AddCommand(StatusCmd)
+	rootCmd.AddCommand(PausedCmd)
 }

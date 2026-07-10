@@ -11,7 +11,6 @@ import (
 	"tracker/internal/client"
 	"tracker/internal/config"
 	"tracker/internal/service"
-	"tracker/internal/tags"
 	"tracker/internal/ui"
 )
 
@@ -61,11 +60,6 @@ var ViewCmd = &cobra.Command{
 				})
 			}
 			ui.Label("Теги", ui.TagsDisplay(tagInfos))
-		} else {
-			taskTags, _ := tags.Get(ticket)
-			if len(taskTags) > 0 {
-				ui.Label("Теги", ui.Cyan(strings.Join(taskTags, ", ")))
-			}
 		}
 
 		fmt.Println()

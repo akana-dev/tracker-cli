@@ -2,12 +2,15 @@ package task
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"tracker/internal/client"
+	"tracker/internal/input"
 	"tracker/internal/service"
 	"tracker/internal/ui"
 	"tracker/pkg/timeparse"
@@ -147,10 +150,27 @@ var DeleteCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ticket := strings.ToUpper(args[0])
+		force, _ := cmd.Flags().GetBool("force")
 
 		task, err := client.GetTaskByTicket(ticket)
 		if err != nil {
 			return fmt.Errorf("тикет %s не найден: %w", ticket, err)
+		}
+
+		if !task.CanDelete {
+			return fmt.Errorf("нет прав на удаление задачи %s", ui.Ticket(ticket))
+		}
+
+		if !force {
+			if !term.IsTerminal(int(os.Stdin.Fd())) {
+				return fmt.Errorf("удаление задачи требует интерактивного терминала или флага --force")
+			}
+
+			confirmed := input.ReadBool(fmt.Sprintf("Удалить задачу %s?", ui.Ticket(ticket)), false)
+			if !confirmed {
+				fmt.Println(ui.Dim("Отменено"))
+				return nil
+			}
 		}
 
 		if err := client.DeleteTask(task.ID); err != nil {
@@ -167,4 +187,5 @@ func init() {
 	CloseCmd.Flags().StringP("solution", "s", "Решено", "Статус решения")
 	PauseCmd.Flags().StringP("at", "t", "", "Время паузы (по умолчанию — текущее)")
 	ResumeCmd.Flags().StringP("start", "s", "", "Время возобновления")
+	DeleteCmd.Flags().BoolP("force", "f", false, "Не запрашивать подтверждение")
 }
