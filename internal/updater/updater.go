@@ -109,7 +109,14 @@ func downloadFile(url string) (string, error) {
 	}
 	defer tmpFile.Close()
 
-	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
+	var writer io.Writer = tmpFile
+	if resp.ContentLength > 0 {
+		pw := ui.NewProgressWriter(resp.ContentLength, "  Скачивание")
+		writer = io.MultiWriter(tmpFile, pw)
+		defer pw.Finish()
+	}
+
+	if _, err := io.Copy(writer, resp.Body); err != nil {
 		os.Remove(tmpFile.Name())
 		return "", err
 	}

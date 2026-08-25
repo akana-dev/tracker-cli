@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"tracker/internal/client"
+	"tracker/internal/app"
 	"tracker/internal/config"
 	"tracker/internal/service"
 	"tracker/internal/ui"
@@ -21,7 +21,8 @@ var FromCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		templateName := args[0]
 
-		tmpl, err := client.GetTemplateByName(templateName)
+		cl := app.GetClient()
+		tmpl, err := cl.GetTemplateByName(templateName)
 		if err != nil {
 			return fmt.Errorf("шаблон '%s' не найден: %w", templateName, err)
 		}
@@ -107,7 +108,7 @@ var FromCmd = &cobra.Command{
 			payload["tag_ids"] = tagIDs
 		}
 
-		task, err := client.CreateTask(payload)
+		task, err := cl.CreateTask(payload)
 		if err != nil {
 			return err
 		}

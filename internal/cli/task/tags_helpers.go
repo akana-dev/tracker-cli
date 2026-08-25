@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"tracker/internal/client"
+	"tracker/internal/app"
 	"tracker/internal/models"
 )
 
@@ -27,7 +27,7 @@ func getTagsFromCache() ([]models.Tag, error) {
 	}
 	tagCache.RUnlock()
 
-	tags, err := client.ListTags("")
+	tags, err := app.GetClient().ListTags("")
 	if err != nil {
 		return nil, fmt.Errorf("не удалось получить список тегов: %w", err)
 	}

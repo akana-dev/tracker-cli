@@ -5,13 +5,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
-
+	"tracker/internal/app"
 	"tracker/internal/cli/task/comment"
-	"tracker/internal/client"
 	"tracker/internal/config"
 	"tracker/internal/service"
 	"tracker/internal/ui"
+
+	"github.com/spf13/cobra"
 )
 
 var ViewCmd = &cobra.Command{
@@ -21,8 +21,8 @@ var ViewCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ticket := strings.ToUpper(args[0])
-
-		task, err := client.GetTaskByTicket(ticket)
+		c := app.GetClient()
+		task, err := c.GetTaskByTicket(ticket)
 		if err != nil {
 			return fmt.Errorf("тикет %s не найден: %w", ticket, err)
 		}
@@ -34,21 +34,19 @@ var ViewCmd = &cobra.Command{
 		}
 
 		fmt.Println()
-
-		statusStr := service.FormatStatus(*task)
-		fmt.Printf("  %s  %s\n", ui.CyanBold(task.Ticket), statusStr)
+		fmt.Println(ui.SectionHeader(fmt.Sprintf("%s  %s", ui.CyanBold(task.Ticket), service.FormatStatus(*task))))
 		fmt.Println()
 
-		ui.Header("Основная информация")
-		ui.Label("Название", ui.Bold(task.Title))
-		ui.Label("Компания", ui.Cyan(task.CompanyName))
-		ui.Label("Сервер", ui.Dim(serverName))
-		ui.Label("Создатель", ui.Cyan(task.GetOwnerDisplay()))
+		fmt.Println(ui.SectionHeader("Основная информация"))
+		fmt.Println(ui.KeyValue("Название", ui.Bold(task.Title), 16))
+		fmt.Println(ui.KeyValue("Компания", ui.Cyan(task.CompanyName), 16))
+		fmt.Println(ui.KeyValue("Сервер", ui.Dim(serverName), 16))
+		fmt.Println(ui.KeyValue("Создатель", ui.Cyan(task.GetOwnerDisplay()), 16))
 
 		if task.IsAssignedToSomeone() {
-			ui.Label("Исполнитель", ui.Cyan(task.GetAssigneeDisplay()))
+			fmt.Println(ui.KeyValue("Исполнитель", ui.Cyan(task.GetAssigneeDisplay()), 16))
 		} else {
-			ui.Label("Исполнитель", ui.Cyan(task.GetAssigneeDisplay())+ui.Dim(" (создатель)"))
+			fmt.Println(ui.KeyValue("Исполнитель", ui.Cyan(task.GetAssigneeDisplay())+ui.Dim(" (создатель)"), 16))
 		}
 
 		if len(task.Tags) > 0 {
@@ -59,50 +57,47 @@ var ViewCmd = &cobra.Command{
 					Color: tag.Color,
 				})
 			}
-			ui.Label("Теги", ui.TagsDisplay(tagInfos))
+			fmt.Println(ui.KeyValue("Теги", ui.TagsDisplay(tagInfos), 16))
 		}
 
 		fmt.Println()
 
-		ui.Header("Время")
-		ui.Label("Начало", task.StartTime.Local().Format("02.01.2006 15:04"))
+		fmt.Println(ui.SectionHeader("Время"))
+		fmt.Println(ui.KeyValue("Начало", task.StartTime.Local().Format("02.01.2006 15:04"), 16))
 
 		if task.IsClosed() {
-			ui.Label("Окончание", task.EndTime.Local().Format("02.01.2006 15:04"))
+			fmt.Println(ui.KeyValue("Окончание", task.EndTime.Local().Format("02.01.2006 15:04"), 16))
 			duration := task.EndTime.Sub(task.StartTime.Time)
-			ui.Label("Длительность", service.FormatDuration(duration))
+			fmt.Println(ui.KeyValue("Длительность", service.FormatDuration(duration), 16))
 		} else {
-			ui.Label("Окончание", ui.Warning("не закрыта"))
+			fmt.Println(ui.KeyValue("Окончание", ui.Warning("не закрыта"), 16))
 		}
 
 		if task.IsPaused() {
-			ui.Label("На паузе с", ui.Warning(task.PausedAt.Local().Format("02.01.2006 15:04")))
+			fmt.Println(ui.KeyValue("На паузе с", ui.Warning(task.PausedAt.Local().Format("02.01.2006 15:04")), 16))
 		}
 
 		totalHours := service.CalculateTaskHours(*task)
-		ui.Label("Отработано", ui.Cyan(fmt.Sprintf("%.1f ч.", totalHours)))
-
+		fmt.Println(ui.KeyValue("Отработано", ui.Cyan(fmt.Sprintf("%.1f ч.", totalHours)), 16))
 		fmt.Println()
 
-		ui.Header("Статус и описание")
-
+		fmt.Println(ui.SectionHeader("Статус и описание"))
 		solution := "—"
 		if task.Solution != nil && *task.Solution != "" {
 			solution = *task.Solution
 		}
-		ui.Label("Решение", statusStr+" "+solution)
+		fmt.Println(ui.KeyValue("Решение", service.FormatStatus(*task)+" "+solution, 16))
 
 		if task.Comment != nil && *task.Comment != "" {
-			ui.Label("Комментарий", "")
+			fmt.Println(ui.KeyValue("Комментарий", "", 16))
 			service.PrintIndented(*task.Comment, "    ")
 		} else {
-			ui.Label("Комментарий", ui.Dim("—"))
+			fmt.Println(ui.KeyValue("Комментарий", ui.Dim("—"), 16))
 		}
 
 		fmt.Println()
 
-		ui.Header(fmt.Sprintf("Сессии (%d)", len(task.Sessions)))
-
+		fmt.Println(ui.SectionHeader(fmt.Sprintf("Сессии (%d)", len(task.Sessions))))
 		if len(task.Sessions) == 0 {
 			fmt.Println("    " + ui.Dim("Нет сессий"))
 		} else {
@@ -110,13 +105,11 @@ var ViewCmd = &cobra.Command{
 				sessionNum := i + 1
 				startLocal := s.StartTime.Time.Local()
 				startStr := startLocal.Format("02.01.2006 15:04")
-
 				fmt.Printf("    %s ", ui.Dim(fmt.Sprintf("#%d", sessionNum)))
 
 				if s.EndTime != nil && !s.EndTime.IsZero() {
 					endStr := service.FormatEndTime(s.StartTime.Time, s.EndTime.Time)
 					duration := s.EndTime.Time.UTC().Sub(s.StartTime.Time.UTC())
-
 					fmt.Printf("%s — %s  %s\n",
 						startStr,
 						endStr,
@@ -142,24 +135,23 @@ var ViewCmd = &cobra.Command{
 
 		fmt.Println()
 
-		ui.Header("Права доступа")
+		fmt.Println(ui.SectionHeader("Права доступа"))
 		if task.CanEdit {
-			ui.Label("Редактирование", ui.StatusOK())
+			fmt.Println(ui.KeyValue("Редактирование", ui.StatusOK(), 16))
 		} else {
-			ui.Label("Редактирование", ui.StatusNo())
+			fmt.Println(ui.KeyValue("Редактирование", ui.StatusNo(), 16))
 		}
 		if task.CanDelete {
-			ui.Label("Удаление", ui.StatusOK())
+			fmt.Println(ui.KeyValue("Удаление", ui.StatusOK(), 16))
 		} else {
-			ui.Label("Удаление", ui.StatusNo())
+			fmt.Println(ui.KeyValue("Удаление", ui.StatusNo(), 16))
 		}
 
 		noComments, _ := cmd.Flags().GetBool("no-comments")
 		if !noComments {
 			fmt.Println()
-			ui.Header(fmt.Sprintf("Комментарии (%d)", len(task.Comments)))
+			fmt.Println(ui.SectionHeader(fmt.Sprintf("Комментарии (%d)", len(task.Comments))))
 			fmt.Println()
-
 			if len(task.Comments) == 0 {
 				fmt.Println("    " + ui.Dim("Нет комментариев"))
 			} else {
@@ -168,7 +160,8 @@ var ViewCmd = &cobra.Command{
 		}
 
 		fmt.Println()
-
+		fmt.Println(ui.Divider(80))
+		fmt.Println()
 		fmt.Println(ui.Dim("Команды для работы с задачей:"))
 		fmt.Printf("  %s  %s\n", ui.Cyan("edit"), ui.Dim("Редактировать задачу"))
 		fmt.Printf("  %s  %s\n", ui.Cyan("pause"), ui.Dim("Поставить на паузу"))

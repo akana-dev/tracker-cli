@@ -136,6 +136,7 @@ type Server struct {
 	AuthMethods     []string `json:"auth_methods"`
 	ADDomain        string   `json:"ad_domain,omitempty"`
 	DefaultCompany  string   `json:"default_company,omitempty"`
+	Plugin          string   `json:"plugin,omitempty"`
 }
 
 type ServersConfig struct {
@@ -273,4 +274,17 @@ type Tag struct {
 	CreatedByID       int    `json:"created_by_id,omitempty"`
 	CreatedByUsername string `json:"created_by_username,omitempty"`
 	CreatedAt         string `json:"created_at,omitempty"`
+}
+
+type BulkResponse struct {
+	Total     int          `json:"total"`
+	Succeeded int          `json:"succeeded"`
+	Failed    int          `json:"failed"`
+	Results   []BulkResult `json:"results"`
+}
+
+type BulkResult struct {
+	TaskID int    `json:"task_id"`
+	Status string `json:"status"`
+	Detail string `json:"detail,omitempty"`
 }

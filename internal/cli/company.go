@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/spf13/cobra"
-
 	"tracker/internal/client"
 	"tracker/internal/config"
 	"tracker/internal/service"
 	"tracker/internal/ui"
 	"tracker/pkg/table"
+
+	"github.com/spf13/cobra"
 )
 
 var companyCmd = &cobra.Command{
@@ -58,57 +58,71 @@ var companyListCmd = &cobra.Command{
 		}
 
 		companies := resp.Companies
-
 		if len(companies) == 0 {
 			fmt.Println(ui.Warning("Компании не найдены."))
 			return nil
 		}
 
 		fmt.Println()
+		fmt.Println(ui.SectionHeader("Компании"))
+		fmt.Println()
+
+		var headerParts []string
+		headerParts = append(headerParts,
+			ui.Bold(fmt.Sprintf("Найдено: %d", resp.Total)),
+		)
 
 		if limit > 0 && resp.Total > 0 {
 			currentPage := resp.CurrentPage()
 			totalPages := resp.Pages()
+			headerParts = append(headerParts,
+				fmt.Sprintf("Страница: %s", ui.Cyan(fmt.Sprintf("%d из %d", currentPage, totalPages))),
+			)
 			startIdx := resp.Offset + 1
 			endIdx := resp.Offset + len(companies)
-
-			fmt.Printf("%s Найдено: %s | Страница: %s | Показано: %s\n",
-				ui.Bold("Компании:"),
-				ui.Bold(fmt.Sprintf("%d", resp.Total)),
-				ui.Cyan(fmt.Sprintf("%d из %d", currentPage, totalPages)),
-				ui.Dim(fmt.Sprintf("%d-%d", startIdx, endIdx)))
-		} else {
-			fmt.Printf("%s Найдено: %s\n",
-				ui.Bold("Компании:"),
-				ui.Bold(fmt.Sprintf("%d", resp.Total)))
+			headerParts = append(headerParts,
+				fmt.Sprintf("Показано: %s", ui.Dim(fmt.Sprintf("%d-%d", startIdx, endIdx))),
+			)
 		}
+
+		fmt.Printf("  %s\n", strings.Join(headerParts, " | "))
+		fmt.Println()
+		fmt.Println(ui.Divider(70))
 		fmt.Println()
 
 		tbl := table.New("ID", "Название", "Описание", "След. номер")
+		tbl.SetColumnWidths(map[int]int{0: 6, 1: 20, 2: 45, 3: 12})
+
 		for _, c := range companies {
-			desc := "—"
-			if c.Description != nil {
+			desc := ui.Dim("—")
+			if c.Description != nil && *c.Description != "" {
 				desc = *c.Description
 			}
+
 			tbl.AddRow(
-				fmt.Sprintf("%d", c.ID),
+				ui.Dim(fmt.Sprintf("%d", c.ID)),
 				ui.Bold(c.Name),
 				desc,
-				fmt.Sprintf("%d", c.NextTaskNumber),
+				ui.Cyan(fmt.Sprintf("%d", c.NextTaskNumber)),
 			)
 		}
+
 		tbl.Render()
 
 		if limit > 0 && resp.HasNext() {
 			fmt.Println()
+			fmt.Println(ui.Divider(70))
 			currentPage := resp.CurrentPage()
 			nextPage := currentPage + 1
-			fmt.Println(ui.Dimf("Следующая страница: %s | Показать все: %s",
+			fmt.Printf("  %s %s | %s %s\n",
+				ui.Dim("Следующая страница:"),
 				ui.Cyan(fmt.Sprintf("--page %d", nextPage)),
-				ui.Cyan("--all")))
+				ui.Dim("Показать все:"),
+				ui.Cyan("--all"),
+			)
 		}
-		fmt.Println()
 
+		fmt.Println()
 		return nil
 	},
 }
