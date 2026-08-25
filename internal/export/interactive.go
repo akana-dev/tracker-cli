@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"tracker/internal/client"
-	"tracker/internal/input"
 	"tracker/internal/ui"
+
+	"github.com/charmbracelet/huh"
 )
 
 func RunInteractive() error {
@@ -15,74 +16,113 @@ func RunInteractive() error {
 	ui.Header("Интерактивный экспорт задач")
 	fmt.Println()
 
-	fmt.Println("1. Формат экспорта:")
-	fmt.Printf("   [1] CSV\n   [2] XLSX\n   [3] JSON\n   Выбор: ")
-	formatChoice := input.ReadLine()
-	format := "csv"
-	switch formatChoice {
-	case "2":
-		format = "xlsx"
-	case "3":
-		format = "json"
-	}
-
-	fmt.Println("\n2. Период:")
-	fmt.Println("   [1] Сегодня")
-	fmt.Println("   [2] Эта неделя")
-	fmt.Println("   [3] Этот месяц")
-	fmt.Println("   [4] Последние 7 дней")
-	fmt.Println("   [5] Последние 30 дней")
-	fmt.Println("   [6] Произвольный")
-	fmt.Printf("   Выбор: ")
-	periodChoice := input.ReadLine()
-
+	var format string
+	var periodChoice int
 	var dateFrom, dateTo string
-	switch periodChoice {
-	case "1":
-		dateFrom = "today"
-	case "2":
-		dateFrom = "this week"
-	case "3":
-		dateFrom = "this month"
-	case "4":
-		dateFrom = "last 7 days"
-	case "5":
-		dateFrom = "last 30 days"
-	case "6":
-		fmt.Print("   Дата от (например: 2026-06-01 или 'last monday'): ")
-		dateFrom = input.ReadLine()
-		fmt.Print("   Дата до (например: 2026-06-30 или 'today'): ")
-		dateTo = input.ReadLine()
+	var company, assignee, solution, search string
+	var openOnly, allUsers bool
+	var timezone, output string
+
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Формат экспорта:").
+				Options(
+					huh.NewOption("CSV", "csv"),
+					huh.NewOption("XLSX (Excel)", "xlsx"),
+					huh.NewOption("JSON", "json"),
+				).
+				Value(&format),
+
+			huh.NewSelect[int]().
+				Title("Период:").
+				Options(
+					huh.NewOption("Сегодня", 1),
+					huh.NewOption("Эта неделя", 2),
+					huh.NewOption("Этот месяц", 3),
+					huh.NewOption("Последние 7 дней", 4),
+					huh.NewOption("Последние 30 дней", 5),
+					huh.NewOption("Произвольный", 6),
+				).
+				Value(&periodChoice),
+		),
+
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Компания (Enter — пропустить):").
+				Value(&company),
+
+			huh.NewInput().
+				Title("Исполнитель (Enter — пропустить):").
+				Value(&assignee),
+
+			huh.NewInput().
+				Title("Статус решения (Enter — пропустить):").
+				Value(&solution),
+
+			huh.NewInput().
+				Title("Поиск (Enter — пропустить):").
+				Value(&search),
+		),
+
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title("Только открытые задачи?").
+				Value(&openOnly),
+
+			huh.NewConfirm().
+				Title("Показать задачи всех пользователей?").
+				Value(&allUsers),
+
+			huh.NewInput().
+				Title("Часовой пояс:").
+				Value(&timezone).
+				Placeholder("Europe/Moscow"),
+
+			huh.NewInput().
+				Title("Имя выходного файла:").
+				Value(&output).
+				Placeholder(fmt.Sprintf("tasks_%s.csv", time.Now().Format("2006-01-02"))),
+		),
+	)
+
+	if err := form.Run(); err != nil {
+		return fmt.Errorf("экспорт отменён: %w", err)
 	}
 
-	fmt.Println("\n3. Фильтры (Enter — пропустить):")
-	fmt.Print("   Компания: ")
-	company := input.ReadLine()
-	fmt.Print("   Исполнитель: ")
-	assignee := input.ReadLine()
-	fmt.Print("   Статус решения: ")
-	solution := input.ReadLine()
-	fmt.Print("   Поиск: ")
-	search := input.ReadLine()
+	switch periodChoice {
+	case 1:
+		dateFrom = "today"
+	case 2:
+		dateFrom = "this week"
+	case 3:
+		dateFrom = "this month"
+	case 4:
+		dateFrom = "last 7 days"
+	case 5:
+		dateFrom = "last 30 days"
+	case 6:
+		customForm := huh.NewForm(
+			huh.NewGroup(
+				huh.NewInput().
+					Title("Дата от (например: 2026-06-01 или 'last monday'):").
+					Value(&dateFrom),
 
-	fmt.Println("\n4. Дополнительные опции:")
-	openOnly := input.ReadBool("   Только открытые задачи?", false)
-	allUsers := input.ReadBool("   Показать задачи всех пользователей?", false)
+				huh.NewInput().
+					Title("Дата до (например: 2026-06-30 или 'today'):").
+					Value(&dateTo),
+			),
+		)
+		if err := customForm.Run(); err != nil {
+			return fmt.Errorf("экспорт отменён: %w", err)
+		}
+	}
 
-	fmt.Println("\n5. Часовой пояс:")
-	fmt.Printf("   [по умолчанию: Europe/Moscow]: ")
-	timezone := input.ReadLine()
 	if timezone == "" {
 		timezone = "Europe/Moscow"
 	}
-
-	fmt.Println("\n6. Имя выходного файла:")
-	ext := format
-	defaultFilename := fmt.Sprintf("tasks_%s.%s", time.Now().Format("2006-01-02"), ext)
-	fmt.Printf("   [по умолчанию: %s]: ", defaultFilename)
-	output := input.ReadLine()
 	if output == "" {
-		output = defaultFilename
+		output = fmt.Sprintf("tasks_%s.%s", time.Now().Format("2006-01-02"), format)
 	}
 
 	resolvedFrom, resolvedTo, err := ResolveDates("", dateFrom, dateTo)
@@ -145,13 +185,26 @@ func RunInteractive() error {
 	fmt.Printf("  Файл: %s\n", output)
 	fmt.Println()
 
-	if !input.ReadBool("Продолжить экспорт?", true) {
+	var confirmed bool
+	confirmForm := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title("Продолжить экспорт?").
+				Affirmative("Да").
+				Negative("Нет").
+				Value(&confirmed),
+		),
+	)
+
+	if err := confirmForm.Run(); err != nil || !confirmed {
 		fmt.Println(ui.Warning("Экспорт отменён."))
 		return nil
 	}
 
 	fmt.Println()
-	data, apiFilename, err := client.ExportTasks(params)
+	data, apiFilename, err := ui.WithSpinnerExport("Экспорт задач", func() ([]byte, string, error) {
+		return client.ExportTasks(params)
+	})
 	if err != nil {
 		return err
 	}

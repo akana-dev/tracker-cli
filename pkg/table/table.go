@@ -4,6 +4,9 @@ import (
 	"io"
 	"os"
 
+	"tracker/internal/ui"
+
+	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 )
@@ -62,7 +65,11 @@ func (t *Table) Render() {
 	if len(t.headers) > 0 {
 		headerRow := make(table.Row, len(t.headers))
 		for i, h := range t.headers {
-			headerRow[i] = h
+			if ui.ShouldUseColors() {
+				headerRow[i] = color.New(color.FgHiCyan, color.Bold).Sprint(h)
+			} else {
+				headerRow[i] = h
+			}
 		}
 		tw.AppendHeader(headerRow)
 	}
@@ -80,31 +87,31 @@ func (t *Table) Render() {
 
 func StyleLight() table.Style {
 	style := table.StyleLight
-	style.Color.Header = text.Colors{text.FgHiCyan, text.Bold}
 	style.Options.DrawBorder = true
 	style.Options.SeparateHeader = true
 	style.Options.SeparateRows = false
-
 	style.Format.Header = text.FormatUpper
 	style.Format.Row = text.FormatDefault
 	style.Format.Footer = text.FormatUpper
+
+	style.Color.Header = text.Colors{}
 
 	return style
 }
 
 func StyleRounded() table.Style {
 	style := table.StyleRounded
-	style.Color.Header = text.Colors{text.FgHiCyan, text.Bold}
 	style.Options.DrawBorder = true
 	style.Options.SeparateHeader = true
+	style.Color.Header = text.Colors{}
 	return style
 }
 
 func StyleDouble() table.Style {
 	style := table.StyleDouble
-	style.Color.Header = text.Colors{text.FgHiCyan, text.Bold}
 	style.Options.DrawBorder = true
 	style.Options.SeparateHeader = true
+	style.Color.Header = text.Colors{}
 	return style
 }
 

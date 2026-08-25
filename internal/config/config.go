@@ -175,6 +175,7 @@ type ServerInfo struct {
 	IsCurrent bool
 	HasToken  bool
 	UserRole  string
+	Plugin    string
 }
 
 func ListServers() ([]ServerInfo, error) {
@@ -191,6 +192,7 @@ func ListServers() ([]ServerInfo, error) {
 			IsCurrent: name == config.Current,
 			HasToken:  server.Token != "",
 			UserRole:  server.UserRole,
+			Plugin:    server.Plugin,
 		})
 	}
 
