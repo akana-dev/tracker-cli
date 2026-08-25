@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"tracker/internal/client"
+	"tracker/internal/app"
 	"tracker/internal/export"
 	"tracker/internal/presets"
 	"tracker/internal/ui"
@@ -194,7 +194,10 @@ var ExportCmd = &cobra.Command{
 			return export.RunPreview(params, format)
 		}
 
-		data, apiFilename, err := client.ExportTasks(params)
+		c := app.GetClient()
+		data, apiFilename, err := ui.WithSpinnerExport("Экспорт задач", func() ([]byte, string, error) {
+			return c.ExportTasks(params)
+		})
 		if err != nil {
 			return err
 		}

@@ -11,6 +11,7 @@ import (
 	"tracker/internal/cli/task"
 	"tracker/internal/config"
 	"tracker/internal/installer"
+	"tracker/internal/ui"
 	"tracker/internal/updater"
 	"tracker/internal/version"
 )
@@ -155,6 +156,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&installFlag, "install", false, "Установить tracker в систему (добавить в PATH)")
 	rootCmd.Flags().BoolVar(&uninstallFlag, "uninstall", false, "Удалить tracker из системы")
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Показать версию")
+	rootCmd.PersistentFlags().BoolVar(&ui.PlainMode, "plain", false, "Отключить цвета и интерактив (для скриптов)")
 
 	rootCmd.AddCommand(loginCmd)
 	rootCmd.AddCommand(logoutCmd)
@@ -178,4 +180,6 @@ func init() {
 	rootCmd.AddCommand(StopCmd)
 	rootCmd.AddCommand(StatusCmd)
 	rootCmd.AddCommand(PausedCmd)
+
+	rootCmd.AddCommand(pluginCmd)
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"tracker/internal/client"
+	"tracker/internal/app"
 	"tracker/internal/input"
 	"tracker/internal/service"
 	"tracker/internal/ui"
@@ -28,18 +28,19 @@ var CloseCmd = &cobra.Command{
 			return err
 		}
 
-		task, err := client.GetTaskByTicket(ticket)
+		c := app.GetClient()
+		task, err := c.GetTaskByTicket(ticket)
 		if err != nil {
 			return fmt.Errorf("тикет %s не найден: %w", ticket, err)
 		}
 
 		payload := map[string]interface{}{"solution": solution}
-		if _, err := client.UpdateTask(task.ID, payload); err != nil {
+		if _, err := c.UpdateTask(task.ID, payload); err != nil {
 			return err
 		}
 
-		fmt.Println(ui.Checkmark(), ui.Successf("Задача %s закрыта со статусом %s",
-			ui.Ticket(ticket), ui.Bold(solution)))
+		fmt.Println(ui.SuccessAction("Задача закрыта", ticket))
+		fmt.Println(ui.Dimf("  Статус: %s", solution))
 		return nil
 	},
 }
@@ -52,7 +53,8 @@ var PauseCmd = &cobra.Command{
 		ticket := strings.ToUpper(args[0])
 		atStr, _ := cmd.Flags().GetString("at")
 
-		task, err := client.GetTaskByTicket(ticket)
+		c := app.GetClient()
+		task, err := c.GetTaskByTicket(ticket)
 		if err != nil {
 			return fmt.Errorf("тикет %s не найден: %w", ticket, err)
 		}
@@ -66,13 +68,12 @@ var PauseCmd = &cobra.Command{
 			if pauseTime.After(time.Now()) {
 				return fmt.Errorf("время паузы не может быть в будущем")
 			}
-			// Отправляем время на сервер (ключ 'paused_at' зависит от вашего API)
 			payload = map[string]interface{}{
 				"paused_at": pauseTime.UTC().Format(time.RFC3339),
 			}
 		}
 
-		if _, err := client.PauseTask(task.ID, payload); err != nil {
+		if _, err := c.PauseTask(task.ID, payload); err != nil {
 			return err
 		}
 
@@ -90,7 +91,8 @@ var ResumeCmd = &cobra.Command{
 		ticket := strings.ToUpper(args[0])
 		startStr, _ := cmd.Flags().GetString("start")
 
-		task, err := client.GetTaskByTicket(ticket)
+		c := app.GetClient()
+		task, err := c.GetTaskByTicket(ticket)
 		if err != nil {
 			return fmt.Errorf("тикет %s не найден: %w", ticket, err)
 		}
@@ -106,7 +108,7 @@ var ResumeCmd = &cobra.Command{
 			}
 		}
 
-		if _, err := client.ResumeTask(task.ID, payload); err != nil {
+		if _, err := c.ResumeTask(task.ID, payload); err != nil {
 			return err
 		}
 
@@ -128,13 +130,14 @@ var AssignCmd = &cobra.Command{
 			return err
 		}
 
-		task, err := client.GetTaskByTicket(ticket)
+		c := app.GetClient()
+		task, err := c.GetTaskByTicket(ticket)
 		if err != nil {
 			return fmt.Errorf("тикет %s не найден: %w", ticket, err)
 		}
 
 		payload := map[string]interface{}{"assignee_username": username}
-		if _, err := client.UpdateTask(task.ID, payload); err != nil {
+		if _, err := c.UpdateTask(task.ID, payload); err != nil {
 			return err
 		}
 
@@ -152,7 +155,8 @@ var DeleteCmd = &cobra.Command{
 		ticket := strings.ToUpper(args[0])
 		force, _ := cmd.Flags().GetBool("force")
 
-		task, err := client.GetTaskByTicket(ticket)
+		c := app.GetClient()
+		task, err := c.GetTaskByTicket(ticket)
 		if err != nil {
 			return fmt.Errorf("тикет %s не найден: %w", ticket, err)
 		}
@@ -173,7 +177,7 @@ var DeleteCmd = &cobra.Command{
 			}
 		}
 
-		if err := client.DeleteTask(task.ID); err != nil {
+		if err := c.DeleteTask(task.ID); err != nil {
 			return err
 		}
 

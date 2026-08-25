@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"tracker/internal/client"
+	"tracker/internal/app"
 	"tracker/internal/service"
 	"tracker/internal/ui"
 	"tracker/pkg/table"
@@ -20,7 +20,9 @@ var EditCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ticket := strings.ToUpper(args[0])
-		task, err := client.GetTaskByTicket(ticket)
+
+		c := app.GetClient()
+		task, err := c.GetTaskByTicket(ticket)
 		if err != nil {
 			return fmt.Errorf("тикет %s не найден: %w", ticket, err)
 		}
@@ -101,7 +103,7 @@ var EditCmd = &cobra.Command{
 			return nil
 		}
 
-		updatedTask, err := client.UpdateTask(task.ID, payload)
+		updatedTask, err := c.UpdateTask(task.ID, payload)
 		if err != nil {
 			return err
 		}

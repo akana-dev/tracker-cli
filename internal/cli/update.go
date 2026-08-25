@@ -5,22 +5,21 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/spf13/cobra"
-
 	"tracker/internal/ui"
 	"tracker/internal/updater"
+
+	"github.com/spf13/cobra"
 )
 
 var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Проверить и установить обновление",
 	Long: `Проверить наличие новой версии tracker и установить её.
-
 Примеры:
-  tracker update                  # Проверить и установить
-  tracker update --check          # Только проверить (с полной информацией)
-  tracker update --version 1.2.3  # Установить конкретную версию
-  tracker update --pre-release    # Включая pre-release версии`,
+tracker update                  # Проверить и установить
+tracker update --check          # Только проверить (с полной информацией)
+tracker update --version 1.2.3  # Установить конкретную версию
+tracker update --pre-release    # Включая pre-release версии`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		checkOnly, _ := cmd.Flags().GetBool("check")
 		specificVersion, _ := cmd.Flags().GetString("version")
@@ -28,16 +27,17 @@ var updateCmd = &cobra.Command{
 
 		updater.ResetNotification()
 
-		fmt.Println(ui.Dim("Проверка обновлений..."))
-
-		ctx := context.Background()
-		result, err := updater.CheckForUpdate(ctx, githubOwner, githubRepo, includePreRelease)
+		result, err := ui.WithSpinnerResult("Проверка обновлений", func() (*updater.CheckResult, error) {
+			ctx := context.Background()
+			return updater.CheckForUpdate(ctx, githubOwner, githubRepo, includePreRelease)
+		})
 		if err != nil {
 			return fmt.Errorf("ошибка проверки: %w", err)
 		}
 
 		if !result.HasUpdate {
-			fmt.Println(ui.Checkmark(), ui.Successf("У вас актуальная версия (%s)", updater.FormatVersion(result.CurrentVersion)))
+			fmt.Println(ui.Checkmark(), ui.Successf("У вас актуальная версия (%s)",
+				updater.FormatVersion(result.CurrentVersion)))
 			return nil
 		}
 
@@ -47,7 +47,6 @@ var updateCmd = &cobra.Command{
 		}
 
 		updater.ShowFullUpdateInfo(result)
-
 		fmt.Println(ui.Bold("Начинаю обновление..."))
 		fmt.Println()
 
@@ -61,9 +60,9 @@ var updateCmd = &cobra.Command{
 		}
 
 		fmt.Println()
-		fmt.Println(ui.Checkmark(), ui.Successf("Обновление до версии %s завершено!", updater.FormatVersion(targetVersion)))
+		fmt.Println(ui.Checkmark(), ui.Successf("Обновление до версии %s завершено!",
+			updater.FormatVersion(targetVersion)))
 		fmt.Println(ui.Dim("Перезапустите tracker для использования новой версии."))
-
 		return nil
 	},
 }

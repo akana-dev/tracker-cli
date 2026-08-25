@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/spf13/cobra"
-
-	"tracker/internal/client"
+	"tracker/internal/app"
 	"tracker/internal/service"
 	"tracker/internal/ui"
 	"tracker/pkg/table"
 	"tracker/pkg/timeparse"
+
+	"github.com/spf13/cobra"
 )
 
 var ListCmd = &cobra.Command{
@@ -77,13 +77,13 @@ var ListCmd = &cobra.Command{
 			}
 		}
 
-		resp, err := client.ListTasks(params, limit, offset)
+		c := app.GetClient()
+		resp, err := c.ListTasks(params, limit, offset)
 		if err != nil {
 			return err
 		}
 
 		tasks := resp.Tasks
-
 		if len(tasks) == 0 {
 			fmt.Println(ui.Warning("Задачи не найдены."))
 			return nil
@@ -92,21 +92,24 @@ var ListCmd = &cobra.Command{
 		stats := service.CalculateTasksStats(tasks)
 
 		fmt.Println()
+		fmt.Println(ui.SectionHeader("Задачи"))
 
-		headerParts := []string{
+		var headerParts []string
+		headerParts = append(headerParts,
 			ui.Bold(fmt.Sprintf("Найдено: %d", resp.Total)),
-		}
+		)
 
 		if limit > 0 && resp.Total > 0 {
 			currentPage := resp.CurrentPage()
 			totalPages := resp.Pages()
 			headerParts = append(headerParts,
-				fmt.Sprintf("Страница: %s", ui.Cyan(fmt.Sprintf("%d из %d", currentPage, totalPages))))
-
+				fmt.Sprintf("Страница: %s", ui.Cyan(fmt.Sprintf("%d из %d", currentPage, totalPages))),
+			)
 			startIdx := resp.Offset + 1
 			endIdx := resp.Offset + len(tasks)
 			headerParts = append(headerParts,
-				fmt.Sprintf("Показано: %s", ui.Dim(fmt.Sprintf("%d-%d", startIdx, endIdx))))
+				fmt.Sprintf("Показано: %s", ui.Dim(fmt.Sprintf("%d-%d", startIdx, endIdx))),
+			)
 		}
 
 		headerParts = append(headerParts,
@@ -116,7 +119,9 @@ var ListCmd = &cobra.Command{
 			fmt.Sprintf("Время: %s", ui.Cyan(fmt.Sprintf("%.1f ч.", stats.TotalHours))),
 		)
 
-		fmt.Printf("%s %s\n", ui.Bold("Задачи:"), strings.Join(headerParts, " | "))
+		fmt.Printf("  %s\n", strings.Join(headerParts, " | "))
+		fmt.Println()
+		fmt.Println(ui.Divider(80))
 		fmt.Println()
 
 		tbl := table.New("Тикет", "Дата", "Сессии", "Часы", "Задача", "Исполнитель", "Статус")
@@ -134,7 +139,7 @@ var ListCmd = &cobra.Command{
 						Color: tag.Color,
 					})
 				}
-				taskCell += " " + ui.Dim("[") + ui.TagsDisplay(tagInfos) + ui.Dim("]")
+				taskCell += "\n  " + ui.TagsDisplay(tagInfos)
 			}
 
 			tbl.AddRow(
@@ -147,18 +152,23 @@ var ListCmd = &cobra.Command{
 				service.FormatStatus(t),
 			)
 		}
+
 		tbl.Render()
 
 		if limit > 0 && resp.HasNext() {
 			fmt.Println()
+			fmt.Println(ui.Divider(80))
 			currentPage := resp.CurrentPage()
 			nextPage := currentPage + 1
-			fmt.Println(ui.Dimf("Следующая страница: %s | Показать все: %s",
+			fmt.Printf("  %s %s | %s %s\n",
+				ui.Dim("Следующая страница:"),
 				ui.Cyan(fmt.Sprintf("--page %d", nextPage)),
-				ui.Cyan("--all")))
+				ui.Dim("Показать все:"),
+				ui.Cyan("--all"),
+			)
 		}
-		fmt.Println()
 
+		fmt.Println()
 		return nil
 	},
 }
@@ -173,7 +183,6 @@ func init() {
 	ListCmd.Flags().StringP("search", "s", "", "Поиск")
 	ListCmd.Flags().BoolP("search-comments", "C", false, "Искать также в комментариях")
 	ListCmd.Flags().StringSliceP("tag", "T", nil, "Фильтр по тегам (через запятую)")
-
 	ListCmd.Flags().BoolP("all", "A", false, "Показать все задачи")
 	ListCmd.Flags().IntP("page", "p", 1, "Номер страницы")
 	ListCmd.Flags().IntP("limit", "l", service.DefaultPageSize, "Количество задач на странице")

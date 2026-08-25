@@ -9,28 +9,160 @@ import (
 )
 
 var (
-	Success = color.New(color.FgGreen).SprintFunc()
-	Error   = color.New(color.FgRed).SprintFunc()
-	Warning = color.New(color.FgYellow).SprintFunc()
-	Info    = color.New(color.FgCyan).SprintFunc()
-	Bold    = color.New(color.Bold).SprintFunc()
-	Dim     = color.New(color.Faint).SprintFunc()
-	Cyan    = color.New(color.FgCyan).SprintFunc()
-	Green   = color.New(color.FgGreen).SprintFunc()
-	Red     = color.New(color.FgRed).SprintFunc()
-	Yellow  = color.New(color.FgYellow).SprintFunc()
-	Blue    = color.New(color.FgBlue).SprintFunc()
-	Magenta = color.New(color.FgMagenta).SprintFunc()
+	Success = func(a ...interface{}) string {
+		if !ShouldUseColors() {
+			return fmt.Sprint(a...)
+		}
+		t := GetTheme()
+		if t != nil && t.styles != nil {
+			return t.styles.success.Render(fmt.Sprint(a...))
+		}
+		return color.New(color.FgGreen).Sprint(a...)
+	}
 
-	SuccessBold = color.New(color.FgGreen, color.Bold).SprintFunc()
-	ErrorBold   = color.New(color.FgRed, color.Bold).SprintFunc()
-	WarningBold = color.New(color.FgYellow, color.Bold).SprintFunc()
-	InfoBold    = color.New(color.FgCyan, color.Bold).SprintFunc()
-	CyanBold    = color.New(color.FgCyan, color.Bold).SprintFunc()
-	RedBold     = color.New(color.FgRed, color.Bold).SprintFunc()
-	GreenBold   = color.New(color.FgGreen, color.Bold).SprintFunc()
-	YellowBold  = color.New(color.FgYellow, color.Bold).SprintFunc()
-	MagentaBold = color.New(color.FgMagenta, color.Bold).SprintFunc()
+	Error = func(a ...interface{}) string {
+		if !ShouldUseColors() {
+			return fmt.Sprint(a...)
+		}
+		t := GetTheme()
+		if t != nil && t.styles != nil {
+			return t.styles.error.Render(fmt.Sprint(a...))
+		}
+		return color.New(color.FgRed).Sprint(a...)
+	}
+
+	Warning = func(a ...interface{}) string {
+		if !ShouldUseColors() {
+			return fmt.Sprint(a...)
+		}
+		t := GetTheme()
+		if t != nil && t.styles != nil {
+			return t.styles.warning.Render(fmt.Sprint(a...))
+		}
+		return color.New(color.FgYellow).Sprint(a...)
+	}
+
+	Info = func(a ...interface{}) string {
+		if !ShouldUseColors() {
+			return fmt.Sprint(a...)
+		}
+		t := GetTheme()
+		if t != nil && t.styles != nil {
+			return t.styles.info.Render(fmt.Sprint(a...))
+		}
+		return color.New(color.FgCyan).Sprint(a...)
+	}
+
+	Bold = func(a ...interface{}) string {
+		if !ShouldUseColors() {
+			return fmt.Sprint(a...)
+		}
+		t := GetTheme()
+		if t != nil && t.styles != nil {
+			return t.styles.bold.Render(fmt.Sprint(a...))
+		}
+		return color.New(color.Bold).Sprint(a...)
+	}
+
+	Dim = func(a ...interface{}) string {
+		if !ShouldUseColors() {
+			return fmt.Sprint(a...)
+		}
+		t := GetTheme()
+		if t != nil && t.styles != nil {
+			return t.styles.muted.Render(fmt.Sprint(a...))
+		}
+		return color.New(color.Faint).Sprint(a...)
+	}
+
+	Cyan = func(a ...interface{}) string {
+		if !ShouldUseColors() {
+			return fmt.Sprint(a...)
+		}
+		t := GetTheme()
+		if t != nil && t.styles != nil {
+			return t.styles.info.Render(fmt.Sprint(a...))
+		}
+		return color.New(color.FgCyan).Sprint(a...)
+	}
+
+	Green  = Success
+	Red    = Error
+	Yellow = Warning
+	Blue   = Info
+
+	Magenta = func(a ...interface{}) string {
+		if !ShouldUseColors() {
+			return fmt.Sprint(a...)
+		}
+		return color.New(color.FgMagenta).Sprint(a...)
+	}
+
+	SuccessBold = func(a ...interface{}) string {
+		if !ShouldUseColors() {
+			return fmt.Sprint(a...)
+		}
+		t := GetTheme()
+		if t != nil && t.styles != nil {
+			return t.styles.success.Copy().Bold(true).Render(fmt.Sprint(a...))
+		}
+		return color.New(color.FgGreen, color.Bold).Sprint(a...)
+	}
+
+	ErrorBold = func(a ...interface{}) string {
+		if !ShouldUseColors() {
+			return fmt.Sprint(a...)
+		}
+		t := GetTheme()
+		if t != nil && t.styles != nil {
+			return t.styles.error.Copy().Bold(true).Render(fmt.Sprint(a...))
+		}
+		return color.New(color.FgRed, color.Bold).Sprint(a...)
+	}
+
+	WarningBold = func(a ...interface{}) string {
+		if !ShouldUseColors() {
+			return fmt.Sprint(a...)
+		}
+		t := GetTheme()
+		if t != nil && t.styles != nil {
+			return t.styles.warning.Copy().Bold(true).Render(fmt.Sprint(a...))
+		}
+		return color.New(color.FgYellow, color.Bold).Sprint(a...)
+	}
+
+	InfoBold = func(a ...interface{}) string {
+		if !ShouldUseColors() {
+			return fmt.Sprint(a...)
+		}
+		t := GetTheme()
+		if t != nil && t.styles != nil {
+			return t.styles.info.Copy().Bold(true).Render(fmt.Sprint(a...))
+		}
+		return color.New(color.FgCyan, color.Bold).Sprint(a...)
+	}
+
+	CyanBold = func(a ...interface{}) string {
+		if !ShouldUseColors() {
+			return fmt.Sprint(a...)
+		}
+		t := GetTheme()
+		if t != nil && t.styles != nil {
+			return t.styles.info.Copy().Bold(true).Render(fmt.Sprint(a...))
+		}
+		return color.New(color.FgCyan, color.Bold).Sprint(a...)
+	}
+
+	RedBold    = ErrorBold
+	GreenBold  = SuccessBold
+	YellowBold = WarningBold
+
+	MagentaBold = func(a ...interface{}) string {
+		if !ShouldUseColors() {
+			return fmt.Sprint(a...)
+		}
+		return color.New(color.FgMagenta, color.Bold).Sprint(a...)
+	}
 )
 
 func Successf(format string, a ...interface{}) string {
@@ -66,38 +198,72 @@ func CyanBoldf(format string, a ...interface{}) string {
 }
 
 func Header(title string) {
-	fmt.Println(InfoBold(title))
+	if !ShouldUseColors() {
+		fmt.Println(title)
+		fmt.Println(strings.Repeat("-", len(title)))
+		return
+	}
+	fmt.Println(SectionHeader(title))
 }
 
 func Label(label, value string) {
-	fmt.Printf("  %s  %s\n", Dim(label+":"), value)
+	if !ShouldUseColors() {
+		fmt.Printf("  %s: %s\n", label, value)
+		return
+	}
+	fmt.Println(KeyValue(label, value, 16))
 }
 
 func Checkmark() string {
+	if !ShouldUseColors() {
+		return "[OK]"
+	}
 	return Success("✓")
 }
 
 func Cross() string {
+	if !ShouldUseColors() {
+		return "[ERR]"
+	}
 	return Error("✗")
 }
 
 func Bullet() string {
+	if !ShouldUseColors() {
+		return "-"
+	}
 	return Dim("•")
 }
 
 func Ticket(ticket string) string {
+	if !ShouldUseColors() {
+		return ticket
+	}
+	t := GetTheme()
+	if t != nil && t.styles != nil {
+		return t.styles.ticket.Render(ticket)
+	}
 	return CyanBold(ticket)
 }
 
 func StatusOK() string {
+	if !ShouldUseColors() {
+		return "да"
+	}
 	return Success("да")
 }
 
 func StatusNo() string {
+	if !ShouldUseColors() {
+		return "нет"
+	}
 	return Error("нет")
 }
 
 func RoleColor(role string) string {
+	if !ShouldUseColors() {
+		return role
+	}
 	switch role {
 	case "admin":
 		return RedBold(role)
@@ -111,19 +277,28 @@ func RoleColor(role string) string {
 }
 
 func InProgress(text string) string {
+	if !ShouldUseColors() {
+		return text
+	}
 	return Green(text)
 }
 
 func Paused(text string) string {
+	if !ShouldUseColors() {
+		return text
+	}
 	return Warning(text)
 }
 
 func Closed(text string) string {
+	if !ShouldUseColors() {
+		return text
+	}
 	return Dim(text)
 }
 
 func TagWithColor(name, hexColor string) string {
-	if hexColor == "" {
+	if !ShouldUseColors() || hexColor == "" {
 		return name
 	}
 
