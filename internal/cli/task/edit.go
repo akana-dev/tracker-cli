@@ -16,7 +16,7 @@ import (
 
 var EditCmd = &cobra.Command{
 	Use:     "edit [тикет]",
-	Aliases: []string{"update", "modify"},
+	Aliases: []string{"modify"},
 	Short:   "Редактировать задачу",
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
