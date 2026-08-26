@@ -14,23 +14,37 @@ import (
 )
 
 var ExportCmd = &cobra.Command{
-	Use:   "export",
+	Use:   "export [формат]",
 	Short: "Экспорт задач в файл",
 	Long: `Экспорт задач в файл различных форматов с гибкой фильтрацией.
+Формат можно указать как позиционный аргумент или через флаг --format.
 
 Поддерживаемые форматы: csv, json, xlsx
 
 Примеры:
-  tracker task export --format csv --output tasks.csv
-  tracker task export --preset monthly
-  tracker task export --format xlsx --period "last month"
-  tracker task export --format csv --preview --today
-  tracker task export --interactive
-  tracker task export --format csv --fields ticket,title,hours --today`,
+  tracker export csv --today
+  tracker export xlsx --period "last month"
+  tracker export json --company ACME
+  tracker export --format csv --preset monthly
+  tracker export preset list
+  tracker export --interactive`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		interactive, _ := cmd.Flags().GetBool("interactive")
 		if interactive {
 			return export.RunInteractive()
+		}
+
+		if len(args) > 0 {
+			formatArg := strings.ToLower(args[0])
+			switch formatArg {
+			case "csv", "json", "xlsx":
+				_ = cmd.Flags().Set("format", formatArg)
+			case "preset":
+				return nil
+			default:
+				return fmt.Errorf("неизвестный формат: %s (допустимы: csv, json, xlsx)", formatArg)
+			}
 		}
 
 		presetName, _ := cmd.Flags().GetString("preset")

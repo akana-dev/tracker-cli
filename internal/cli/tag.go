@@ -13,14 +13,16 @@ import (
 )
 
 var tagCmd = &cobra.Command{
-	Use:   "tag",
-	Short: "Управление тегами задач",
+	Use:     "tag",
+	Aliases: []string{"tags"},
+	Short:   "Управление тегами задач",
 }
 
 var tagAddCmd = &cobra.Command{
-	Use:   "add [имя]",
-	Short: "Создать тег",
-	Args:  cobra.ExactArgs(1),
+	Use:     "add [имя]",
+	Aliases: []string{"new", "create"},
+	Short:   "Создать тег",
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 		color, _ := cmd.Flags().GetString("color")
@@ -44,8 +46,9 @@ var tagAddCmd = &cobra.Command{
 }
 
 var tagListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "Показать все теги",
+	Use:     "list",
+	Aliases: []string{"ls", "l"},
+	Short:   "Показать все теги",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		search, _ := cmd.Flags().GetString("search")
 		tags, err := client.ListTags(search)
@@ -116,9 +119,10 @@ var tagUpdateCmd = &cobra.Command{
 }
 
 var tagDeleteCmd = &cobra.Command{
-	Use:   "delete [id]",
-	Short: "Удалить тег",
-	Args:  cobra.ExactArgs(1),
+	Use:     "delete [id]",
+	Aliases: []string{"del", "rm", "remove"},
+	Short:   "Удалить тег",
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		id, err := strconv.Atoi(args[0])
 		if err != nil {

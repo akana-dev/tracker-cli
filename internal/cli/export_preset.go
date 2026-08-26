@@ -4,45 +4,36 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/spf13/cobra"
-
+	"tracker/internal/cli/task"
 	"tracker/internal/presets"
 	"tracker/internal/ui"
 	"tracker/pkg/table"
-)
 
-var exportCmd = &cobra.Command{
-	Use:   "export",
-	Short: "Управление экспортом",
-	Long:  "Команды для управления экспортом задач, включая пресеты.",
-}
+	"github.com/spf13/cobra"
+)
 
 var exportPresetCmd = &cobra.Command{
 	Use:   "preset",
 	Short: "Управление пресетами экспорта",
 	Long: `Пресеты позволяют сохранять часто используемые конфигурации экспорта.
-
 Примеры:
-  tracker export preset save monthly --format xlsx --period "last month" --all-users
-  tracker export --preset monthly
-  tracker export preset list
-  tracker export preset remove monthly`,
+tracker export preset save monthly --format xlsx --period "last month" --all-users
+tracker export --preset monthly
+tracker export preset list
+tracker export preset remove monthly`,
 }
 
 var exportPresetSaveCmd = &cobra.Command{
 	Use:   "save [имя]",
 	Short: "Сохранить пресет",
 	Long: `Сохранить текущие параметры экспорта как пресет.
-
 Все флаги, указанные после имени пресета, будут сохранены.
-
 Примеры:
-  tracker export preset save monthly --format xlsx --period "last month"
-  tracker export preset save weekly --format csv --company COMP1 --all-users`,
+tracker export preset save monthly --format xlsx --period "last month"
+tracker export preset save weekly --format csv --company COMP1 --all-users`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
-
 		preset := &presets.ExportPreset{
 			Name: name,
 		}
@@ -50,22 +41,18 @@ var exportPresetSaveCmd = &cobra.Command{
 		if format, _ := cmd.Flags().GetString("format"); format != "" {
 			preset.Format = format
 		}
-
 		if period, _ := cmd.Flags().GetString("period"); period != "" {
 			preset.Period = period
 		}
-
 		if dateFrom, _ := cmd.Flags().GetString("date-from"); dateFrom != "" {
 			preset.DateFrom = dateFrom
 		}
 		if dateTo, _ := cmd.Flags().GetString("date-to"); dateTo != "" {
 			preset.DateTo = dateTo
 		}
-
 		if timezone, _ := cmd.Flags().GetString("timezone"); timezone != "" {
 			preset.Timezone = timezone
 		}
-
 		if company, _ := cmd.Flags().GetString("company"); company != "" {
 			preset.Company = company
 		}
@@ -81,7 +68,6 @@ var exportPresetSaveCmd = &cobra.Command{
 		if ticket, _ := cmd.Flags().GetString("ticket"); ticket != "" {
 			preset.Ticket = ticket
 		}
-
 		if openOnly, _ := cmd.Flags().GetBool("open-only"); openOnly {
 			preset.OpenOnly = true
 		}
@@ -97,11 +83,9 @@ var exportPresetSaveCmd = &cobra.Command{
 		if allUsers, _ := cmd.Flags().GetBool("all-users"); allUsers {
 			preset.AllUsers = true
 		}
-
 		if fields, _ := cmd.Flags().GetString("fields"); fields != "" {
 			preset.Fields = strings.Split(fields, ",")
 		}
-
 		if desc, _ := cmd.Flags().GetString("description"); desc != "" {
 			preset.Description = desc
 		}
@@ -123,7 +107,6 @@ var exportPresetListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-
 		if len(allPresets) == 0 {
 			fmt.Println(ui.Warning("Пресеты не найдены."))
 			fmt.Println(ui.Dim("Создайте пресет: tracker export preset save <имя> [флаги]"))
@@ -133,6 +116,7 @@ var exportPresetListCmd = &cobra.Command{
 		fmt.Println()
 		tbl := table.New("Имя", "Формат", "Период", "Описание")
 		tbl.SetColumnWidths(map[int]int{0: 25, 1: 10, 2: 20, 3: 40})
+
 		for _, p := range allPresets {
 			desc := p.Description
 			if desc == "" {
@@ -155,7 +139,6 @@ var exportPresetListCmd = &cobra.Command{
 		}
 		tbl.Render()
 		fmt.Println()
-
 		return nil
 	},
 }
@@ -166,7 +149,6 @@ var exportPresetShowCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
-
 		preset, err := presets.Get(name)
 		if err != nil {
 			return err
@@ -174,13 +156,10 @@ var exportPresetShowCmd = &cobra.Command{
 
 		fmt.Println()
 		ui.Header(fmt.Sprintf("Пресет: %s", ui.CyanBold(preset.Name)))
-
 		if preset.Description != "" {
 			ui.Label("Описание", preset.Description)
 		}
-
 		ui.Label("Формат", ui.Cyan(preset.Format))
-
 		if preset.Period != "" {
 			ui.Label("Период", ui.Cyan(preset.Period))
 		}
@@ -196,7 +175,6 @@ var exportPresetShowCmd = &cobra.Command{
 
 		fmt.Println()
 		ui.Header("Фильтры")
-
 		if preset.Company != "" {
 			ui.Label("Компания", ui.Cyan(preset.Company))
 		}
@@ -212,7 +190,6 @@ var exportPresetShowCmd = &cobra.Command{
 		if preset.Ticket != "" {
 			ui.Label("Тикет", ui.Cyan(preset.Ticket))
 		}
-
 		if preset.OpenOnly {
 			ui.Label("Только открытые", ui.StatusOK())
 		}
@@ -228,11 +205,9 @@ var exportPresetShowCmd = &cobra.Command{
 		if preset.AllUsers {
 			ui.Label("Все пользователи", ui.StatusOK())
 		}
-
 		if len(preset.Fields) > 0 {
 			ui.Label("Поля", ui.Cyan(strings.Join(preset.Fields, ", ")))
 		}
-
 		fmt.Println()
 		return nil
 	},
@@ -247,7 +222,6 @@ var exportPresetRemoveCmd = &cobra.Command{
 		if err := presets.Delete(name); err != nil {
 			return err
 		}
-
 		fmt.Println(ui.Checkmark(), ui.Successf("Пресет %s удалён", ui.Bold(name)))
 		return nil
 	},
@@ -277,5 +251,5 @@ func init() {
 	exportPresetCmd.AddCommand(exportPresetShowCmd)
 	exportPresetCmd.AddCommand(exportPresetRemoveCmd)
 
-	exportCmd.AddCommand(exportPresetCmd)
+	task.ExportCmd.AddCommand(exportPresetCmd)
 }

@@ -15,9 +15,10 @@ import (
 )
 
 var EditCmd = &cobra.Command{
-	Use:   "edit [тикет]",
-	Short: "Редактировать задачу",
-	Args:  cobra.ExactArgs(1),
+	Use:     "edit [тикет]",
+	Aliases: []string{"update", "modify"},
+	Short:   "Редактировать задачу",
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ticket := strings.ToUpper(args[0])
 
@@ -88,13 +89,22 @@ var EditCmd = &cobra.Command{
 			changes = append(changes, "теги очищены")
 		} else if cmd.Flags().Changed("tag") {
 			tagNames, _ := cmd.Flags().GetStringSlice("tag")
-			if len(tagNames) > 0 {
-				tagIDs, err := resolveTagNamesToIDs(tagNames)
+			var allTags []string
+			for _, t := range tagNames {
+				for _, part := range strings.Split(t, ",") {
+					part = strings.TrimSpace(part)
+					if part != "" {
+						allTags = append(allTags, part)
+					}
+				}
+			}
+			if len(allTags) > 0 {
+				tagIDs, err := resolveTagNamesToIDs(allTags)
 				if err != nil {
 					return err
 				}
 				payload["tag_ids"] = tagIDs
-				changes = append(changes, fmt.Sprintf("теги=[%s]", strings.Join(tagNames, ", ")))
+				changes = append(changes, fmt.Sprintf("теги=[%s]", strings.Join(allTags, ", ")))
 			}
 		}
 
@@ -140,6 +150,6 @@ func init() {
 	EditCmd.Flags().StringP("assignee", "a", "", "Новый исполнитель")
 	EditCmd.Flags().StringP("solution", "S", "", "Новый статус")
 	EditCmd.Flags().StringP("comment", "C", "", "Новый комментарий")
-	EditCmd.Flags().StringSliceP("tag", "T", nil, "Новые теги задачи (полная замена)")
+	EditCmd.Flags().StringSliceP("tag", "T", nil, "Новые теги задачи (через запятую: bug,urgent)")
 	EditCmd.Flags().Bool("clear-tags", false, "Очистить все теги задачи")
 }

@@ -5,17 +5,20 @@
 ## Возможности
 
 - **Множественные серверы** — работа с несколькими трекерами одновременно
+- **Verb-First команды** — короткие команды верхнего уровня для частых действий (например, `tracker show`, `tracker close`)
+- **Умные алиасы** — встроенные короткие имена для команд (например, `tracker t ls`, `tracker issue view`)
 - **Управление задачами** — создание, редактирование, закрытие, пауза, возобновление
 - **Кастомные времена** — указание произвольного времени для pause/resume
-- **Комментарии** — Markdown, @mentions, watch через polling
+- **Комментарии** — поддержка Markdown, @mentions, watch через polling
 - **Серверные теги** — классификация задач с цветовой маркировкой (True Color)
 - **Серверные шаблоны** — предзаполненные наборы для быстрого создания задач
 - **Bulk-операции** — массовое закрытие, назначение, удаление задач
 - **Поиск** — по названию, комментариям задач и содержимому комментариев
-- **Экспорт** — CSV, JSON, XLSX с пресетами и относительными датами
+- **Экспорт** — CSV, JSON, XLSX с пресетами, относительными датами и позиционным указанием формата
 - **Автообновление** — через GitHub Releases с проверкой checksums
-- **Алиасы** — короткие команды для частых операций
-- **Относительные даты** — `today`, `last 7 days`, `this month`, `last monday`
+- **Пользовательские алиасы** — создание собственных коротких команд для частых сценариев
+- **Относительные даты** — поддержка периодов: `today`, `last 7 days`, `this month`, `last monday`
+- **Plain-режим** — отключение цветов и интерактива через флаг `--plain` или переменную окружения `NO_COLOR=1` для использования в скриптах
 
 ## Установка
 
@@ -55,22 +58,22 @@ tracker server add work https://tracker.example.com
 # 2. Авторизация
 tracker login --username ivanov
 
-# 3. Создание задачи
-tracker task add "Исправить баг в авторизации" --company ACME --tag bug --tag urgent
+# 3. Создание задачи (новые короткие команды)
+tracker add "Исправить баг в авторизации" -q ACME -T bug,urgent
 
 # 4. Просмотр задач
-tracker task list --today
-tracker task list --tag bug
+tracker ls --period today
+tracker ls -T bug
 
 # 5. Детали задачи
-tracker task view ACME-15
+tracker show ACME-15
 
 # 6. Пауза/возобновление с кастомным временем
 tracker pause ACME-15 --at "14:30"
 tracker resume ACME-15 --start "15:00"
 
 # 7. Закрытие задачи
-tracker task close ACME-15 --solution "Исправлено"
+tracker close ACME-15 -s "Исправлено"
 ```
 
 ## Конфигурация
@@ -80,9 +83,10 @@ tracker task close ACME-15 --solution "Исправлено"
 | Файл | Описание |
 |------|----------|
 | `servers.json` | Серверы и токены авторизации |
-| `aliases.json` | Алиасы команд |
+| `aliases.json` | Пользовательские алиасы команд |
 | `update-check.json` | Кэш проверок обновлений |
 | `export-presets.yaml` | Пресеты экспорта |
+| `theme.json` | Настройки цветовой темы интерфейса |
 
 ### Управление серверами
 
@@ -102,6 +106,24 @@ tracker config show
 
 ## Команды
 
+### Быстрые действия (Verb-First)
+
+Эти команды являются сокращениями для `tracker task ...` и позволяют работать быстрее:
+
+```bash
+tracker show <тикет>          # Просмотр задачи (алиасы: v, view, info)
+tracker close <тикет>         # Закрытие задачи (алиасы: c, done, finish)
+tracker pause <тикет>         # Пауза (алиасы: hold)
+tracker resume <тикет>        # Возобновление (алиасы: r, continue)
+tracker assign <тикет> <user> # Назначение (алиасы: a)
+tracker edit <тикет>          # Редактирование (алиасы: e, update, modify)
+tracker delete <тикет>        # Удаление (алиасы: del, rm, remove)
+tracker add "Название"        # Создание задачи (алиасы: new, create)
+tracker ls                    # Список задач (алиасы: list, l)
+tracker use <шаблон>          # Создание из шаблона (алиасы: from, template)
+```
+*Примечание: Полные команды (например, `tracker task view`) продолжают работать для обратной совместимости.*
+
 ### Задачи
 
 ```bash
@@ -113,7 +135,8 @@ tracker task add "Название задачи" [флаги]
   -a, --assignee string   Исполнитель
   -S, --solution string   Статус
   -C, --comment string    Комментарий
-  -T, --tag strings       Теги (можно указать несколько)
+  -T, --tag strings       Теги (можно указать несколько или через запятую: bug,urgent)
+  -i, --interactive       Интерактивный режим создания
 
 # Из шаблона
 tracker task from <имя_шаблона> [флаги]
@@ -124,15 +147,13 @@ tracker task from <имя_шаблона> [флаги]
 
 # Список
 tracker task list [флаги]
-  -t, --today             Только сегодня
-  -w, --week              За неделю
-  -m, --month             За месяц
+  -p, --period string     Относительный период (today, week, month, 'last 7 days')
   -q, --company string    Фильтр по компании
   -S, --solution string   Фильтр по статусу
   -a, --assignee string   Фильтр по исполнителю
   -s, --search string     Поиск
   -C, --search-comments   Искать также в комментариях
-  -T, --tag strings       Фильтр по тегам
+  -T, --tag strings       Фильтр по тегам (через запятую)
   -A, --all               Показать все задачи
   -p, --page int          Номер страницы
   -l, --limit int         Количество задач на странице
@@ -152,28 +173,41 @@ tracker task edit <тикет> [флаги]
   -S, --solution string   Новый статус
   -C, --comment string    Новый комментарий
   -T, --tag strings       Новые теги (полная замена)
+  --clear-tags            Очистить все теги задачи
 
 # Жизненный цикл
 tracker task close <тикет> [-s, --solution string]
 tracker task pause <тикет> [-t, --at string]
 tracker task resume <тикет> [-s, --start string]
 tracker task assign <тикет> <исполнитель>
-tracker task delete <тикет>
+tracker task delete <тикет> [-f, --force]
 
 # Bulk-операции
 tracker task bulk close <тикет1> <тикет2> ...
 tracker task bulk assign <исполнитель> <тикет1> <тикет2> ...
 tracker task bulk delete <тикет1> <тикет2> ... [-f, --force]
+```
 
-# Экспорт
-tracker task export [флаги]
-  -f, --format string     Формат: csv, json, xlsx
+### Экспорт
+
+Формат можно указывать как позиционный аргумент или через флаг.
+
+```bash
+tracker export [формат] [флаги]
+  Формат (позиционный): csv, json, xlsx
   -o, --output string     Имя выходного файла
   -p, --period string     Относительный период
   -D, --date-from string  Дата начала
   -T, --date-to string    Дата конца
-  -i, --interactive       Интерактивный режим
   -r, --preset string     Имя пресета
+  -i, --interactive       Интерактивный режим
+  -v, --preview           Показать превью перед экспортом
+
+# Подкоманды управления пресетами:
+tracker export preset save <имя> [флаги]
+tracker export preset list
+tracker export preset show <имя>
+tracker export preset remove <имя>
 ```
 
 ### Комментарии
@@ -189,8 +223,8 @@ tracker task comment add <тикет> [флаги]
   --file string           Прочитать из файла
   -i, --interactive       Интерактивный режим
 
-tracker task comment edit <id> <новый текст>
-tracker task comment delete <id>
+tracker task comment edit <тикет> <id> <новый текст>
+tracker task comment delete <тикет> <id>
 tracker task comment watch <тикет>   # Polling новых комментариев
 ```
 
@@ -201,15 +235,6 @@ tracker tag add <имя> [-c, --color string]   # Цвет опционален 
 tracker tag list [-s, --search string]
 tracker tag update <id> [-n, --name string] [-c, --color string]
 tracker tag delete <id> [-f, --force]
-```
-
-Примеры:
-```bash
-tracker tag add bug --color "#FF5733"
-tracker tag add urgent
-tracker tag add golang -c "#00add8"
-tracker task add "Исправить баг" --tag bug --tag urgent
-tracker task list --tag bug --tag urgent
 ```
 
 ### Шаблоны
@@ -250,19 +275,13 @@ tracker company delete <название>
 
 ### Алиасы
 
+Пользователь может создавать собственные сокращения для частых сценариев.
+
 ```bash
 tracker alias add <имя> <команда>
 tracker alias list
 tracker alias remove <имя>
-```
-
-### Пресеты экспорта
-
-```bash
-tracker export preset save <имя> [флаги]
-tracker export preset list
-tracker export preset show <имя>
-tracker export preset remove <имя>
+tracker alias reset            # Сбросить все алиасы к начальным настройкам
 ```
 
 ### Обновление
@@ -275,25 +294,17 @@ tracker update --pre-release    # Включая pre-release
 
 ## Примеры использования
 
-### Работа с тегами
+### Оптимизация рабочих процессов
 
 ```bash
-# Создание тегов с цветами
-tracker tag add bug --color "#FF5733"
-tracker tag add urgent -c "#C70039"
-tracker tag add golang -c "#00add8"
+# Использование коротких команд и алиасов
+tracker ls -p today -T bug,urgent
+tracker show ACME-15
+tracker close ACME-15 -s "Исправлено"
 
-# Привязка тегов к задаче
-tracker task add "Оптимизация запроса" --tag golang --tag urgent
-
-# Фильтрация по тегам (OR-логика)
-tracker task list --tag bug --tag urgent
-
-# Обновление тегов задачи (полная замена)
-tracker task edit ACME-15 --tag critical-bug --tag urgent
-
-# Очистка всех тегов
-tracker task edit ACME-15 --tag
+# Создание пользовательского алиаса для частого сценария
+tracker alias add mybugs "ls -p today -T bug"
+tracker mybugs  # Выполнит: tracker ls --period today --tag bug,urgent
 ```
 
 ### Bulk-операции
@@ -308,17 +319,6 @@ tracker task bulk assign ivanov ACME-20 ACME-21 ACME-22
 # Массовое удаление с подтверждением
 tracker task bulk delete ACME-99 ACME-100
 tracker task bulk delete --force ACME-99 ACME-100
-```
-
-### Поиск
-
-```bash
-# Поиск по названию и комментарию задачи
-tracker task list --search "авторизации"
-
-# Поиск также в комментариях
-tracker task list --search "авторизации" --search-comments
-tracker task list -s "авторизации" -C
 ```
 
 ### Кастомные времена
@@ -336,18 +336,32 @@ tracker resume ACME-15 -s "2026-07-01T15:00:00"
 ### Экспорт
 
 ```bash
-# Экспорт за сегодня в CSV
-tracker task export --format csv --period today
+# Экспорт за сегодня в CSV (позиционный формат)
+tracker export csv --period today
 
 # Экспорт за последнюю неделю в XLSX
-tracker task export -f xlsx -p "last 7 days"
+tracker export xlsx -p "last 7 days"
 
 # Экспорт с пресетом
 tracker export preset save weekly --format xlsx --period "this week"
-tracker task export --preset weekly
+tracker export --preset weekly
 
-# Интерактивный режим
-tracker task export --interactive
+# Интерактивный режим с превью
+tracker export --interactive
+tracker export csv --preview --period today
+```
+
+## Скрипты и автоматизация
+
+Для использования в bash-скриптах или CI/CD рекомендуется отключать цвета и интерактивные элементы:
+
+```bash
+# Через флаг
+tracker --plain task list --period today
+
+# Через переменную окружения (стандарт no-color.org)
+NO_COLOR=1 tracker task list > output.txt
+TRACKER_PLAIN=1 tracker task list
 ```
 
 ## Разработка
@@ -356,7 +370,7 @@ tracker task export --interactive
 
 ```bash
 make build              # Локальная сборка
-make build-all          # Кроссплатформенная + checksums
+make build-all          # Кроссплатформенная сборка + checksums
 ```
 
 ### Тесты
@@ -387,8 +401,11 @@ export TRACKER_NO_UPDATE_CHECK=1
 
 ## Зависимости
 
-- `github.com/fatih/color` — цветовая разметка
-- `github.com/jedib0t/go-pretty/v6` — таблицы
+- `github.com/fatih/color` — базовая цветовая разметка
+- `github.com/charmbracelet/lipgloss` — стилизация текста и UI-компонентов
+- `github.com/charmbracelet/huh` — интерактивные формы ввода
+- `github.com/pterm/pterm` — спиннеры и прогресс-бары
+- `github.com/jedib0t/go-pretty/v6` — форматирование таблиц
 - `github.com/spf13/cobra` — CLI-фреймворк
 - `github.com/charmbracelet/glamour` — рендеринг Markdown
 - `golang.org/x/term` — работа с терминалом

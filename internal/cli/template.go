@@ -13,14 +13,16 @@ import (
 )
 
 var templateCmd = &cobra.Command{
-	Use:   "template",
-	Short: "Управление шаблонами задач",
+	Use:     "template",
+	Aliases: []string{"templates", "tmpl"},
+	Short:   "Управление шаблонами задач",
 }
 
 var templateAddCmd = &cobra.Command{
-	Use:   "add [имя]",
-	Short: "Создать шаблон",
-	Args:  cobra.ExactArgs(1),
+	Use:     "add [имя]",
+	Aliases: []string{"new", "create"},
+	Short:   "Создать шаблон",
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 		title, _ := cmd.Flags().GetString("title")
@@ -44,8 +46,9 @@ var templateAddCmd = &cobra.Command{
 }
 
 var templateListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "Показать все шаблоны",
+	Use:     "list",
+	Aliases: []string{"ls", "l"},
+	Short:   "Показать все шаблоны",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		includeAll, _ := cmd.Flags().GetBool("all")
 		templates, err := client.ListTemplates(includeAll)
@@ -125,9 +128,10 @@ var templateUseCmd = &cobra.Command{
 }
 
 var templateDeleteCmd = &cobra.Command{
-	Use:   "delete [id]",
-	Short: "Удалить шаблон",
-	Args:  cobra.ExactArgs(1),
+	Use:     "delete [id]",
+	Aliases: []string{"del", "rm", "remove"},
+	Short:   "Удалить шаблон",
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		id, err := strconv.Atoi(args[0])
 		if err != nil {

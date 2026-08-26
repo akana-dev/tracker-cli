@@ -15,9 +15,10 @@ import (
 )
 
 var FromCmd = &cobra.Command{
-	Use:   "from [имя_шаблона]",
-	Short: "Создать задачу из шаблона",
-	Args:  cobra.ExactArgs(1),
+	Use:     "from [имя_шаблона]",
+	Aliases: []string{"use", "template"},
+	Short:   "Создать задачу из шаблона",
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		templateName := args[0]
 
@@ -101,11 +102,22 @@ var FromCmd = &cobra.Command{
 
 		tagNames, _ := cmd.Flags().GetStringSlice("tag")
 		if len(tagNames) > 0 {
-			tagIDs, err := resolveTagNamesToIDs(tagNames)
-			if err != nil {
-				return err
+			var allTags []string
+			for _, t := range tagNames {
+				for _, part := range strings.Split(t, ",") {
+					part = strings.TrimSpace(part)
+					if part != "" {
+						allTags = append(allTags, part)
+					}
+				}
 			}
-			payload["tag_ids"] = tagIDs
+			if len(allTags) > 0 {
+				tagIDs, err := resolveTagNamesToIDs(allTags)
+				if err != nil {
+					return err
+				}
+				payload["tag_ids"] = tagIDs
+			}
 		}
 
 		task, err := cl.CreateTask(payload)
@@ -134,5 +146,5 @@ func init() {
 	FromCmd.Flags().StringP("assignee", "a", "", "Переопределить исполнителя")
 	FromCmd.Flags().StringP("solution", "S", "", "Переопределить статус")
 	FromCmd.Flags().StringP("comment", "C", "", "Переопределить комментарий (перезапишет description шаблона)")
-	FromCmd.Flags().StringSliceP("tag", "T", nil, "Дополнительные теги")
+	FromCmd.Flags().StringSliceP("tag", "T", nil, "Дополнительные теги (через запятую)")
 }

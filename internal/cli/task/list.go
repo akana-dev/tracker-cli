@@ -3,8 +3,10 @@ package task
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"tracker/internal/app"
+	"tracker/internal/dates"
 	"tracker/internal/service"
 	"tracker/internal/ui"
 	"tracker/pkg/table"
@@ -14,20 +16,33 @@ import (
 )
 
 var ListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "Показать задачи",
+	Use:     "list",
+	Aliases: []string{"ls", "l"},
+	Short:   "Показать задачи",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		params := map[string]string{}
 
-		if today, _ := cmd.Flags().GetBool("today"); today {
-			params["date_from"] = timeparse.TodayStart()
+		if period, _ := cmd.Flags().GetString("period"); period != "" {
+			from, to, err := dates.ParsePeriod(period)
+			if err != nil {
+				return fmt.Errorf("ошибка в периоде %q: %w", period, err)
+			}
+			params["date_from"] = from.UTC().Format(time.RFC3339)
+			if !to.IsZero() && to.Before(time.Now().Add(24*time.Hour)) {
+				params["date_to"] = to.UTC().Format(time.RFC3339)
+			}
+		} else {
+			if today, _ := cmd.Flags().GetBool("today"); today {
+				params["date_from"] = timeparse.TodayStart()
+			}
+			if week, _ := cmd.Flags().GetBool("week"); week {
+				params["date_from"] = timeparse.WeekAgo()
+			}
+			if month, _ := cmd.Flags().GetBool("month"); month {
+				params["date_from"] = timeparse.MonthAgo()
+			}
 		}
-		if week, _ := cmd.Flags().GetBool("week"); week {
-			params["date_from"] = timeparse.WeekAgo()
-		}
-		if month, _ := cmd.Flags().GetBool("month"); month {
-			params["date_from"] = timeparse.MonthAgo()
-		}
+
 		if company, _ := cmd.Flags().GetString("company"); company != "" {
 			params["company"] = company
 		}
@@ -43,8 +58,20 @@ var ListCmd = &cobra.Command{
 		if searchComments, _ := cmd.Flags().GetBool("search-comments"); searchComments {
 			params["search_comments"] = "true"
 		}
+
 		if tagFilter, _ := cmd.Flags().GetStringSlice("tag"); len(tagFilter) > 0 {
-			params["tags"] = strings.Join(tagFilter, ",")
+			var allTags []string
+			for _, t := range tagFilter {
+				for _, part := range strings.Split(t, ",") {
+					part = strings.TrimSpace(part)
+					if part != "" {
+						allTags = append(allTags, part)
+					}
+				}
+			}
+			if len(allTags) > 0 {
+				params["tags"] = strings.Join(allTags, ",")
+			}
 		}
 
 		all, _ := cmd.Flags().GetBool("all")
@@ -92,24 +119,19 @@ var ListCmd = &cobra.Command{
 		stats := service.CalculateTasksStats(tasks)
 
 		fmt.Println()
-		fmt.Println(ui.SectionHeader("Задачи"))
-
-		var headerParts []string
-		headerParts = append(headerParts,
+		headerParts := []string{
 			ui.Bold(fmt.Sprintf("Найдено: %d", resp.Total)),
-		)
+		}
 
 		if limit > 0 && resp.Total > 0 {
 			currentPage := resp.CurrentPage()
 			totalPages := resp.Pages()
 			headerParts = append(headerParts,
-				fmt.Sprintf("Страница: %s", ui.Cyan(fmt.Sprintf("%d из %d", currentPage, totalPages))),
-			)
+				fmt.Sprintf("Страница: %s", ui.Cyan(fmt.Sprintf("%d из %d", currentPage, totalPages))))
 			startIdx := resp.Offset + 1
 			endIdx := resp.Offset + len(tasks)
 			headerParts = append(headerParts,
-				fmt.Sprintf("Показано: %s", ui.Dim(fmt.Sprintf("%d-%d", startIdx, endIdx))),
-			)
+				fmt.Sprintf("Показано: %s", ui.Dim(fmt.Sprintf("%d-%d", startIdx, endIdx))))
 		}
 
 		headerParts = append(headerParts,
@@ -119,9 +141,7 @@ var ListCmd = &cobra.Command{
 			fmt.Sprintf("Время: %s", ui.Cyan(fmt.Sprintf("%.1f ч.", stats.TotalHours))),
 		)
 
-		fmt.Printf("  %s\n", strings.Join(headerParts, " | "))
-		fmt.Println()
-		fmt.Println(ui.Divider(80))
+		fmt.Printf("%s %s\n", ui.Bold("Задачи:"), strings.Join(headerParts, " | "))
 		fmt.Println()
 
 		tbl := table.New("Тикет", "Дата", "Сессии", "Часы", "Задача", "Исполнитель", "Статус")
@@ -139,7 +159,7 @@ var ListCmd = &cobra.Command{
 						Color: tag.Color,
 					})
 				}
-				taskCell += "\n  " + ui.TagsDisplay(tagInfos)
+				taskCell += " " + ui.Dim("[") + ui.TagsDisplay(tagInfos) + ui.Dim("]")
 			}
 
 			tbl.AddRow(
@@ -157,15 +177,11 @@ var ListCmd = &cobra.Command{
 
 		if limit > 0 && resp.HasNext() {
 			fmt.Println()
-			fmt.Println(ui.Divider(80))
 			currentPage := resp.CurrentPage()
 			nextPage := currentPage + 1
-			fmt.Printf("  %s %s | %s %s\n",
-				ui.Dim("Следующая страница:"),
+			fmt.Println(ui.Dimf("Следующая страница: %s | Показать все: %s",
 				ui.Cyan(fmt.Sprintf("--page %d", nextPage)),
-				ui.Dim("Показать все:"),
-				ui.Cyan("--all"),
-			)
+				ui.Cyan("--all")))
 		}
 
 		fmt.Println()
@@ -177,12 +193,13 @@ func init() {
 	ListCmd.Flags().BoolP("today", "t", false, "Только сегодня")
 	ListCmd.Flags().BoolP("week", "w", false, "За неделю")
 	ListCmd.Flags().BoolP("month", "m", false, "За месяц")
+	ListCmd.Flags().String("period", "", "Период: today, week, month, quarter, year, 'last 7 days', 'this month' и т.д.")
 	ListCmd.Flags().StringP("company", "q", "", "Фильтр по компании")
 	ListCmd.Flags().StringP("solution", "S", "", "Фильтр по статусу")
 	ListCmd.Flags().StringP("assignee", "a", "", "Фильтр по исполнителю")
 	ListCmd.Flags().StringP("search", "s", "", "Поиск")
 	ListCmd.Flags().BoolP("search-comments", "C", false, "Искать также в комментариях")
-	ListCmd.Flags().StringSliceP("tag", "T", nil, "Фильтр по тегам (через запятую)")
+	ListCmd.Flags().StringSliceP("tag", "T", nil, "Фильтр по тегам (через запятую: bug,urgent)")
 	ListCmd.Flags().BoolP("all", "A", false, "Показать все задачи")
 	ListCmd.Flags().IntP("page", "p", 1, "Номер страницы")
 	ListCmd.Flags().IntP("limit", "l", service.DefaultPageSize, "Количество задач на странице")
