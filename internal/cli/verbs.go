@@ -71,7 +71,7 @@ func init() {
 
 	editCmd = copyCommand(task.EditCmd)
 	editCmd.Use = "edit [тикет]"
-	editCmd.Aliases = []string{"update", "modify"}
+	editCmd.Aliases = []string{"modify"}
 
 	deleteCmd = copyCommand(task.DeleteCmd)
 	deleteCmd.Use = "delete [тикет]"
