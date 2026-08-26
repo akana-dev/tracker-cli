@@ -11,8 +11,9 @@ import (
 )
 
 var pluginCmd = &cobra.Command{
-	Use:   "plugin",
-	Short: "Управление плагинами",
+	Use:     "plugin",
+	Aliases: []string{"plugins"},
+	Short:   "Управление плагинами",
 	Long: `Управление плагинами для интеграции с внешними сервисами.
 
 Примеры:
@@ -24,8 +25,9 @@ var pluginCmd = &cobra.Command{
 }
 
 var pluginListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "Показать список установленных плагинов",
+	Use:     "list",
+	Aliases: []string{"ls", "l"},
+	Short:   "Показать список установленных плагинов",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		registry, err := plugin.LoadPluginsRegistry()
 		if err != nil {
@@ -58,8 +60,9 @@ var pluginListCmd = &cobra.Command{
 }
 
 var pluginInstallCmd = &cobra.Command{
-	Use:   "install [имя] [путь]",
-	Short: "Установить плагин",
+	Use:     "install [имя] [путь]",
+	Aliases: []string{"add"},
+	Short:   "Установить плагин",
 	Long: `Установить плагин из локального файла.
 
 Примеры:
@@ -108,9 +111,10 @@ var pluginInstallCmd = &cobra.Command{
 }
 
 var pluginUninstallCmd = &cobra.Command{
-	Use:   "uninstall [имя]",
-	Short: "Удалить плагин",
-	Args:  cobra.ExactArgs(1),
+	Use:     "uninstall [имя]",
+	Aliases: []string{"remove", "rm", "del"},
+	Short:   "Удалить плагин",
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 

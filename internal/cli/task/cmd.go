@@ -7,8 +7,9 @@ import (
 )
 
 var Cmd = &cobra.Command{
-	Use:   "task",
-	Short: "Управление задачами",
+	Use:     "task",
+	Aliases: []string{"tasks", "issue", "issues"},
+	Short:   "Управление задачами",
 }
 
 func init() {

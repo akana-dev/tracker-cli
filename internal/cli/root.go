@@ -113,12 +113,13 @@ func isPublicCommand(cmd *cobra.Command) bool {
 		"alias": true, "tag": true, "template": true, "config": true,
 		"export": true, "update": true,
 		"start": true, "stop": true, "status": true, "paused": true,
+		"show": true, "close": true, "pause": true, "resume": true,
+		"assign": true, "edit": true, "delete": true, "add": true,
+		"ls": true, "use": true,
 	}
-
 	if publicCmds[cmd.Name()] {
 		return true
 	}
-
 	current := cmd.Parent()
 	for current != nil {
 		if publicCmds[current.Name()] {
@@ -126,7 +127,6 @@ func isPublicCommand(cmd *cobra.Command) bool {
 		}
 		current = current.Parent()
 	}
-
 	return false
 }
 
@@ -169,7 +169,6 @@ func init() {
 
 	rootCmd.AddCommand(task.Cmd)
 	rootCmd.AddCommand(companyCmd)
-	rootCmd.AddCommand(exportCmd)
 
 	rootCmd.AddCommand(aliasCmd)
 	rootCmd.AddCommand(tagCmd)
