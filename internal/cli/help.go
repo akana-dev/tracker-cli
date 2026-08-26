@@ -39,12 +39,13 @@ var groupsConfig = map[string][]commandGroup{
 	"tracker": {
 		{"Авторизация:", []string{"login", "logout", "me", "register"}},
 		{"Конфигурация:", []string{"configure", "server", "config"}},
-		{"Работа с задачами:", []string{"task", "company"}},
+		{"Быстрые действия:", []string{"show", "close", "pause", "resume", "assign", "edit", "delete", "add", "ls", "use"}},
 		{"Быстрые команды:", []string{"start", "stop", "status", "paused"}},
+		{"Работа с задачами (полная):", []string{"task", "company"}},
 		{"Теги и шаблоны:", []string{"tag", "template"}},
 		{"Экспорт:", []string{"export"}},
 		{"Настройки:", []string{"alias"}},
-		{"Администрирование:", []string{"users"}},
+		{"Плагины:", []string{"plugin"}},
 		{"Служебные:", []string{"update"}},
 	},
 	"task": {

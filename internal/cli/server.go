@@ -13,13 +13,15 @@ import (
 )
 
 var serverCmd = &cobra.Command{
-	Use:   "server",
-	Short: "Управление серверами",
+	Use:     "server",
+	Aliases: []string{"srv"},
+	Short:   "Управление серверами",
 }
 
 var serverListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "Показать список серверов",
+	Use:     "list",
+	Aliases: []string{"ls", "l"},
+	Short:   "Показать список серверов",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		servers, err := config.ListServers()
 		if err != nil {
@@ -84,8 +86,9 @@ var serverListCmd = &cobra.Command{
 }
 
 var serverAddCmd = &cobra.Command{
-	Use:   "add",
-	Short: "Добавить новый сервер",
+	Use:     "add",
+	Aliases: []string{"new", "create"},
+	Short:   "Добавить новый сервер",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name, _ := cmd.Flags().GetString("name")
 		url, _ := cmd.Flags().GetString("url")
@@ -105,9 +108,10 @@ var serverAddCmd = &cobra.Command{
 }
 
 var serverRemoveCmd = &cobra.Command{
-	Use:   "remove [имя]",
-	Short: "Удалить сервер",
-	Args:  cobra.ExactArgs(1),
+	Use:     "remove [имя]",
+	Aliases: []string{"rm", "del", "delete"},
+	Short:   "Удалить сервер",
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 		if err := config.RemoveServer(name); err != nil {
@@ -119,9 +123,10 @@ var serverRemoveCmd = &cobra.Command{
 }
 
 var serverUseCmd = &cobra.Command{
-	Use:   "use [имя]",
-	Short: "Переключиться на другой сервер",
-	Args:  cobra.ExactArgs(1),
+	Use:     "use [имя]",
+	Aliases: []string{"switch", "sw"},
+	Short:   "Переключиться на другой сервер",
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 		if err := config.SetCurrentServer(name); err != nil {

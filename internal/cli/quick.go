@@ -130,7 +130,7 @@ var StartCmd = &cobra.Command{
 var StopCmd = &cobra.Command{
 	Use:     "stop",
 	Short:   "Остановить работу над текущей задачей",
-	Aliases: []string{"st"},
+	Aliases: []string{"end"},
 	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		currentState, err := state.Load()
