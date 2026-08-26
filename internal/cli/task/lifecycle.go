@@ -17,9 +17,10 @@ import (
 )
 
 var CloseCmd = &cobra.Command{
-	Use:   "close [тикет]",
-	Short: "Закрыть задачу",
-	Args:  cobra.ExactArgs(1),
+	Use:     "close [тикет]",
+	Aliases: []string{"done", "finish"},
+	Short:   "Закрыть задачу",
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ticket := strings.ToUpper(args[0])
 		solution, _ := cmd.Flags().GetString("solution")
@@ -46,9 +47,10 @@ var CloseCmd = &cobra.Command{
 }
 
 var PauseCmd = &cobra.Command{
-	Use:   "pause [тикет]",
-	Short: "Поставить задачу на паузу",
-	Args:  cobra.ExactArgs(1),
+	Use:     "pause [тикет]",
+	Aliases: []string{"hold"},
+	Short:   "Поставить задачу на паузу",
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ticket := strings.ToUpper(args[0])
 		atStr, _ := cmd.Flags().GetString("at")
@@ -84,9 +86,10 @@ var PauseCmd = &cobra.Command{
 }
 
 var ResumeCmd = &cobra.Command{
-	Use:   "resume [тикет]",
-	Short: "Возобновить задачу",
-	Args:  cobra.ExactArgs(1),
+	Use:     "resume [тикет]",
+	Aliases: []string{"continue"},
+	Short:   "Возобновить задачу",
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ticket := strings.ToUpper(args[0])
 		startStr, _ := cmd.Flags().GetString("start")
@@ -148,9 +151,10 @@ var AssignCmd = &cobra.Command{
 }
 
 var DeleteCmd = &cobra.Command{
-	Use:   "delete [тикет]",
-	Short: "Удалить задачу",
-	Args:  cobra.ExactArgs(1),
+	Use:     "delete [тикет]",
+	Aliases: []string{"del", "rm", "remove"},
+	Short:   "Удалить задачу",
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ticket := strings.ToUpper(args[0])
 		force, _ := cmd.Flags().GetBool("force")

@@ -15,10 +15,11 @@ import (
 )
 
 var ViewCmd = &cobra.Command{
-	Use:   "view [тикет]",
-	Short: "Подробная информация о задаче",
-	Long:  "Показать полную информацию о задаче с сессиями, комментарием и метаданными",
-	Args:  cobra.ExactArgs(1),
+	Use:     "view [тикет]",
+	Aliases: []string{"show"},
+	Short:   "Подробная информация о задаче",
+	Long:    "Показать полную информацию о задаче с сессиями, комментарием и метаданными",
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ticket := strings.ToUpper(args[0])
 		c := app.GetClient()

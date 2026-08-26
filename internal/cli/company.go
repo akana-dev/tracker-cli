@@ -14,13 +14,15 @@ import (
 )
 
 var companyCmd = &cobra.Command{
-	Use:   "company",
-	Short: "Управление компаниями",
+	Use:     "company",
+	Aliases: []string{"companies", "comp"},
+	Short:   "Управление компаниями",
 }
 
 var companyListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "Показать список компаний",
+	Use:     "list",
+	Aliases: []string{"ls", "l"},
+	Short:   "Показать список компаний",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		all, _ := cmd.Flags().GetBool("all")
 		page, _ := cmd.Flags().GetInt("page")
@@ -128,9 +130,10 @@ var companyListCmd = &cobra.Command{
 }
 
 var companyAddCmd = &cobra.Command{
-	Use:   "add [название]",
-	Short: "Добавить новую компанию (только admin)",
-	Args:  cobra.ExactArgs(1),
+	Use:     "add [название]",
+	Aliases: []string{"new", "create"},
+	Short:   "Добавить новую компанию (только admin)",
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if config.GetUserRole() != "admin" {
 			return fmt.Errorf("команда доступна только администраторам")
@@ -158,9 +161,10 @@ var companyAddCmd = &cobra.Command{
 }
 
 var companyDeleteCmd = &cobra.Command{
-	Use:   "delete [название]",
-	Short: "Удалить компанию (только admin)",
-	Args:  cobra.ExactArgs(1),
+	Use:     "delete [название]",
+	Aliases: []string{"del", "rm", "remove"},
+	Short:   "Удалить компанию (только admin)",
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if config.GetUserRole() != "admin" {
 			return fmt.Errorf("команда доступна только администраторам")

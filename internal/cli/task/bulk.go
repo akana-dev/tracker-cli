@@ -18,8 +18,9 @@ import (
 const maxBulkTasks = 100
 
 var BulkCmd = &cobra.Command{
-	Use:   "bulk",
-	Short: "Массовые операции над задачами",
+	Use:     "bulk",
+	Aliases: []string{"mass"},
+	Short:   "Массовые операции над задачами",
 }
 
 var bulkCloseCmd = &cobra.Command{

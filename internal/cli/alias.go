@@ -12,8 +12,9 @@ import (
 )
 
 var aliasCmd = &cobra.Command{
-	Use:   "alias",
-	Short: "Управление алиасами команд",
+	Use:     "alias",
+	Aliases: []string{"aliases"},
+	Short:   "Управление алиасами команд",
 	Long: `Алиасы позволяют создавать короткие команды для часто используемых действий.
 Примеры:
 tracker alias add ll "task list --today"
@@ -23,9 +24,10 @@ tracker ll   # выполнит: tracker task list --today`,
 }
 
 var aliasAddCmd = &cobra.Command{
-	Use:   "add [имя] [команда]",
-	Short: "Добавить новый алиас",
-	Args:  cobra.MinimumNArgs(2),
+	Use:     "add [имя] [команда]",
+	Aliases: []string{"new", "create"},
+	Short:   "Добавить новый алиас",
+	Args:    cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 		value := fmt.Sprintf("%s", args[1])
@@ -46,8 +48,9 @@ var aliasAddCmd = &cobra.Command{
 }
 
 var aliasListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "Показать список алиасов",
+	Use:     "list",
+	Aliases: []string{"ls", "l"},
+	Short:   "Показать список алиасов",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		allAliases, err := aliases.List()
 		if err != nil {
@@ -96,9 +99,10 @@ var aliasListCmd = &cobra.Command{
 }
 
 var aliasRemoveCmd = &cobra.Command{
-	Use:   "remove [имя]",
-	Short: "Удалить алиас",
-	Args:  cobra.ExactArgs(1),
+	Use:     "remove [имя]",
+	Aliases: []string{"rm", "del", "delete"},
+	Short:   "Удалить алиас",
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 		if err := aliases.Remove(name); err != nil {
