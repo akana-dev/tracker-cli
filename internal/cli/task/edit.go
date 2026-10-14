@@ -89,15 +89,7 @@ var EditCmd = &cobra.Command{
 			changes = append(changes, "теги очищены")
 		} else if cmd.Flags().Changed("tag") {
 			tagNames, _ := cmd.Flags().GetStringSlice("tag")
-			var allTags []string
-			for _, t := range tagNames {
-				for _, part := range strings.Split(t, ",") {
-					part = strings.TrimSpace(part)
-					if part != "" {
-						allTags = append(allTags, part)
-					}
-				}
-			}
+			allTags := splitTagNames(tagNames)
 			if len(allTags) > 0 {
 				tagIDs, err := resolveTagNamesToIDs(allTags)
 				if err != nil {

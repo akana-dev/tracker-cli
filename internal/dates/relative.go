@@ -2,125 +2,131 @@ package dates
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
 
+var weekdays = map[string]time.Weekday{
+	"monday":    time.Monday,
+	"tuesday":   time.Tuesday,
+	"wednesday": time.Wednesday,
+	"thursday":  time.Thursday,
+	"friday":    time.Friday,
+	"saturday":  time.Saturday,
+	"sunday":    time.Sunday,
+}
+
 func ParseRelativeDate(s string) (time.Time, error) {
+	return ParseRelativeDateAt(s, time.Now())
+}
+
+func ParseRelativeDateAt(s string, now time.Time) (time.Time, error) {
+	return parseRelativeDate(s, now)
+}
+
+func parseRelativeDate(s string, now time.Time) (time.Time, error) {
 	s = strings.ToLower(strings.TrimSpace(s))
-	now := time.Now()
 
 	switch s {
 	case "now":
 		return now, nil
 	case "today":
-		return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()), nil
+		return startOfDay(now), nil
 	case "yesterday":
-		return time.Date(now.Year(), now.Month(), now.Day()-1, 0, 0, 0, 0, now.Location()), nil
+		return startOfDay(now).AddDate(0, 0, -1), nil
 	case "tomorrow":
-		return time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location()), nil
-	}
-
-	weekdays := map[string]time.Weekday{
-		"monday":    time.Monday,
-		"tuesday":   time.Tuesday,
-		"wednesday": time.Wednesday,
-		"thursday":  time.Thursday,
-		"friday":    time.Friday,
-		"saturday":  time.Saturday,
-		"sunday":    time.Sunday,
+		return startOfDay(now).AddDate(0, 0, 1), nil
 	}
 
 	if weekday, ok := weekdays[s]; ok {
 		return findWeekday(now, weekday, 0), nil
 	}
 
-	for prefix, offset := range map[string]int{"last ": -1, "next ": 1} {
-		if strings.HasPrefix(s, prefix) {
-			dayName := strings.TrimPrefix(s, prefix)
-			if weekday, ok := weekdays[dayName]; ok {
-				return findWeekday(now, weekday, offset), nil
-			}
-		}
-	}
-
-	periods := []struct {
+	weekdayPrefixes := []struct {
 		prefix string
-		calc   func(time.Time, int) time.Time
+		offset int
 	}{
-		{"this week", func(t time.Time, _ int) time.Time {
-			return findWeekday(t, time.Monday, 0)
-		}},
-		{"last week", func(t time.Time, _ int) time.Time {
-			return findWeekday(t, time.Monday, -1)
-		}},
-		{"next week", func(t time.Time, _ int) time.Time {
-			return findWeekday(t, time.Monday, 1)
-		}},
-		{"this month", func(t time.Time, _ int) time.Time {
-			return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, t.Location())
-		}},
-		{"last month", func(t time.Time, _ int) time.Time {
-			return time.Date(t.Year(), t.Month()-1, 1, 0, 0, 0, 0, t.Location())
-		}},
-		{"next month", func(t time.Time, _ int) time.Time {
-			return time.Date(t.Year(), t.Month()+1, 1, 0, 0, 0, 0, t.Location())
-		}},
-		{"this quarter", func(t time.Time, _ int) time.Time {
-			quarter := (int(t.Month())-1)/3 + 1
-			month := time.Month((quarter-1)*3 + 1)
-			return time.Date(t.Year(), month, 1, 0, 0, 0, 0, t.Location())
-		}},
-		{"last quarter", func(t time.Time, _ int) time.Time {
-			quarter := (int(t.Month()) - 1) / 3
-			if quarter == 0 {
-				quarter = 4
-			}
-			month := time.Month((quarter-1)*3 + 1)
-			year := t.Year()
-			if month == time.January && int(t.Month()) <= 3 {
-				year--
-			}
-			return time.Date(year, month, 1, 0, 0, 0, 0, t.Location())
-		}},
-		{"this year", func(t time.Time, _ int) time.Time {
-			return time.Date(t.Year(), time.January, 1, 0, 0, 0, 0, t.Location())
-		}},
-		{"last year", func(t time.Time, _ int) time.Time {
-			return time.Date(t.Year()-1, time.January, 1, 0, 0, 0, 0, t.Location())
-		}},
+		{prefix: "last ", offset: -1},
+		{prefix: "next ", offset: 1},
 	}
-
-	for _, p := range periods {
-		if s == p.prefix {
-			return p.calc(now, 0), nil
+	for _, item := range weekdayPrefixes {
+		if strings.HasPrefix(s, item.prefix) {
+			dayName := strings.TrimPrefix(s, item.prefix)
+			if weekday, ok := weekdays[dayName]; ok {
+				return findWeekday(now, weekday, item.offset), nil
+			}
 		}
 	}
 
-	for _, pattern := range []string{"last ", "past "} {
-		if strings.HasPrefix(s, pattern) {
-			rest := strings.TrimPrefix(s, pattern)
-			parts := strings.Fields(rest)
-			if len(parts) == 2 {
-				var n int
-				fmt.Sscanf(parts[0], "%d", &n)
-				unit := parts[1]
+	periods := map[string]func(time.Time) time.Time{
+		"this week":    func(t time.Time) time.Time { return startOfWeek(t) },
+		"last week":    func(t time.Time) time.Time { return startOfWeek(t).AddDate(0, 0, -7) },
+		"next week":    func(t time.Time) time.Time { return startOfWeek(t).AddDate(0, 0, 7) },
+		"this month":   func(t time.Time) time.Time { return startOfMonth(t) },
+		"last month":   func(t time.Time) time.Time { return startOfMonth(t).AddDate(0, -1, 0) },
+		"next month":   func(t time.Time) time.Time { return startOfMonth(t).AddDate(0, 1, 0) },
+		"this quarter": func(t time.Time) time.Time { return startOfQuarter(t) },
+		"last quarter": func(t time.Time) time.Time { return startOfQuarter(t).AddDate(0, -3, 0) },
+		"this year":    func(t time.Time) time.Time { return startOfYear(t) },
+		"last year":    func(t time.Time) time.Time { return startOfYear(t).AddDate(-1, 0, 0) },
+	}
+	if calc, ok := periods[s]; ok {
+		return calc(now), nil
+	}
 
-				switch unit {
-				case "day", "days":
-					return now.AddDate(0, 0, -n), nil
-				case "week", "weeks":
-					return now.AddDate(0, 0, -n*7), nil
-				case "month", "months":
-					return now.AddDate(0, -n, 0), nil
-				case "year", "years":
-					return now.AddDate(-n, 0, 0), nil
+	for _, prefix := range []string{"last ", "past "} {
+		if strings.HasPrefix(s, prefix) {
+			parts := strings.Fields(strings.TrimPrefix(s, prefix))
+			if len(parts) == 2 {
+				n, err := strconv.Atoi(parts[0])
+				if err != nil {
+					return time.Time{}, fmt.Errorf("некорректное число периодов %q: %w", parts[0], err)
+				}
+				if result, ok := addUnits(now, -n, parts[1]); ok {
+					return result, nil
 				}
 			}
 		}
 	}
 
 	return time.Time{}, fmt.Errorf("не удалось распарсить относительную дату: %s", s)
+}
+
+func startOfDay(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+}
+
+func startOfWeek(t time.Time) time.Time {
+	return findWeekday(t, time.Monday, 0)
+}
+
+func startOfMonth(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, t.Location())
+}
+
+func startOfQuarter(t time.Time) time.Time {
+	month := time.Month(((int(t.Month()) - 1) / 3 * 3) + 1)
+	return time.Date(t.Year(), month, 1, 0, 0, 0, 0, t.Location())
+}
+
+func startOfYear(t time.Time) time.Time {
+	return time.Date(t.Year(), time.January, 1, 0, 0, 0, 0, t.Location())
+}
+
+func addUnits(t time.Time, n int, unit string) (time.Time, bool) {
+	switch unit {
+	case "day", "days":
+		return t.AddDate(0, 0, n), true
+	case "week", "weeks":
+		return t.AddDate(0, 0, n*7), true
+	case "month", "months":
+		return t.AddDate(0, n, 0), true
+	case "year", "years":
+		return t.AddDate(n, 0, 0), true
+	default:
+		return time.Time{}, false
+	}
 }
 
 func findWeekday(t time.Time, weekday time.Weekday, offset int) time.Time {
@@ -132,6 +138,7 @@ func findWeekday(t time.Time, weekday time.Weekday, offset int) time.Time {
 	} else if offset > 0 && diff <= 0 {
 		diff += 7
 	} else if offset == 0 && diff < 0 {
+		// targetDay is already in the current week, so no adjustment is needed.
 	} else if offset == 0 && diff > 0 {
 		diff -= 7
 	}
@@ -141,80 +148,56 @@ func findWeekday(t time.Time, weekday time.Weekday, offset int) time.Time {
 }
 
 func ParsePeriod(s string) (dateFrom, dateTo time.Time, err error) {
+	return ParsePeriodAt(s, time.Now())
+}
+
+func ParsePeriodAt(s string, now time.Time) (dateFrom, dateTo time.Time, err error) {
+	return parsePeriod(s, now)
+}
+
+func parsePeriod(s string, now time.Time) (dateFrom, dateTo time.Time, err error) {
 	s = strings.ToLower(strings.TrimSpace(s))
-	now := time.Now()
 
 	switch s {
 	case "today":
-		dateFrom = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-		dateTo = now
-		return dateFrom, dateTo, nil
-
+		return startOfDay(now), now, nil
 	case "yesterday":
-		yesterday := time.Date(now.Year(), now.Month(), now.Day()-1, 0, 0, 0, 0, now.Location())
+		yesterday := startOfDay(now).AddDate(0, 0, -1)
 		return yesterday, yesterday.Add(24*time.Hour - time.Nanosecond), nil
-
 	case "this week":
-		dateFrom = findWeekday(now, time.Monday, 0)
-		dateTo = now
-		return dateFrom, dateTo, nil
-
+		return startOfWeek(now), now, nil
 	case "last week":
-		lastMonday := findWeekday(now, time.Monday, -1)
-		lastSunday := lastMonday.Add(7*24*time.Hour - time.Nanosecond)
-		return lastMonday, lastSunday, nil
-
+		lastMonday := startOfWeek(now).AddDate(0, 0, -7)
+		return lastMonday, lastMonday.Add(7*time.Hour*24 - time.Nanosecond), nil
 	case "this month":
-		dateFrom = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-		dateTo = now
-		return dateFrom, dateTo, nil
-
+		return startOfMonth(now), now, nil
 	case "last month":
-		firstOfLastMonth := time.Date(now.Year(), now.Month()-1, 1, 0, 0, 0, 0, now.Location())
+		firstOfLastMonth := startOfMonth(now).AddDate(0, -1, 0)
 		lastOfLastMonth := firstOfLastMonth.AddDate(0, 1, -1)
 		lastOfLastMonth = time.Date(lastOfLastMonth.Year(), lastOfLastMonth.Month(), lastOfLastMonth.Day(), 23, 59, 59, 0, now.Location())
 		return firstOfLastMonth, lastOfLastMonth, nil
-
 	case "this quarter":
-		quarter := (int(now.Month())-1)/3 + 1
-		firstMonth := time.Month((quarter-1)*3 + 1)
-		dateFrom = time.Date(now.Year(), firstMonth, 1, 0, 0, 0, 0, now.Location())
-		dateTo = now
-		return dateFrom, dateTo, nil
-
+		return startOfQuarter(now), now, nil
 	case "this year":
-		dateFrom = time.Date(now.Year(), time.January, 1, 0, 0, 0, 0, now.Location())
-		dateTo = now
-		return dateFrom, dateTo, nil
+		return startOfYear(now), now, nil
 	}
 
 	parts := strings.Fields(s)
 	if len(parts) == 3 && (parts[0] == "last" || parts[0] == "past") {
-		var n int
-		fmt.Sscanf(parts[1], "%d", &n)
-		unit := parts[2]
-
-		dateTo = now
-		switch unit {
-		case "day", "days":
-			dateFrom = now.AddDate(0, 0, -n)
-		case "week", "weeks":
-			dateFrom = now.AddDate(0, 0, -n*7)
-		case "month", "months":
-			dateFrom = now.AddDate(0, -n, 0)
-		case "year", "years":
-			dateFrom = now.AddDate(-n, 0, 0)
-		default:
-			return time.Time{}, time.Time{}, fmt.Errorf("неизвестная единица: %s", unit)
+		n, err := strconv.Atoi(parts[1])
+		if err != nil {
+			return time.Time{}, time.Time{}, fmt.Errorf("некорректное число периодов %q: %w", parts[1], err)
 		}
-		return dateFrom, dateTo, nil
+		dateFrom, ok := addUnits(now, -n, parts[2])
+		if !ok {
+			return time.Time{}, time.Time{}, fmt.Errorf("неизвестная единица: %s", parts[2])
+		}
+		return dateFrom, now, nil
 	}
 
-	dateFrom, err = ParseRelativeDate(s)
+	dateFrom, err = parseRelativeDate(s, now)
 	if err != nil {
 		return time.Time{}, time.Time{}, err
 	}
-
-	dateTo = now
-	return dateFrom, dateTo, nil
+	return dateFrom, now, nil
 }

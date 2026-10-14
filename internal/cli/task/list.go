@@ -60,15 +60,7 @@ var ListCmd = &cobra.Command{
 		}
 
 		if tagFilter, _ := cmd.Flags().GetStringSlice("tag"); len(tagFilter) > 0 {
-			var allTags []string
-			for _, t := range tagFilter {
-				for _, part := range strings.Split(t, ",") {
-					part = strings.TrimSpace(part)
-					if part != "" {
-						allTags = append(allTags, part)
-					}
-				}
-			}
+			allTags := splitTagNames(tagFilter)
 			if len(allTags) > 0 {
 				params["tags"] = strings.Join(allTags, ",")
 			}

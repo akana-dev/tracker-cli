@@ -6,7 +6,10 @@ import (
 	"strings"
 )
 
-var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+var (
+	emailRegex    = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+	usernameRegex = regexp.MustCompile(`^[a-zA-Z0-9._\-]+$`)
+)
 
 func ValidateTitle(title string) error {
 	title = strings.TrimSpace(title)
@@ -45,7 +48,7 @@ func ValidateUsername(username string) error {
 		return fmt.Errorf("имя пользователя слишком длинное (максимум %d символов, у вас %d)",
 			MaxUsernameLength, len(username))
 	}
-	if !regexp.MustCompile(`^[a-zA-Z0-9._\-]+$`).MatchString(username) {
+	if !usernameRegex.MatchString(username) {
 		return fmt.Errorf("имя пользователя может содержать только буквы, цифры, точки, дефисы и подчёркивания")
 	}
 	return nil

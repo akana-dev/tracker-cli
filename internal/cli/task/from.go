@@ -102,15 +102,7 @@ var FromCmd = &cobra.Command{
 
 		tagNames, _ := cmd.Flags().GetStringSlice("tag")
 		if len(tagNames) > 0 {
-			var allTags []string
-			for _, t := range tagNames {
-				for _, part := range strings.Split(t, ",") {
-					part = strings.TrimSpace(part)
-					if part != "" {
-						allTags = append(allTags, part)
-					}
-				}
-			}
+			allTags := splitTagNames(tagNames)
 			if len(allTags) > 0 {
 				tagIDs, err := resolveTagNamesToIDs(allTags)
 				if err != nil {

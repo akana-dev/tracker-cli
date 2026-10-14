@@ -18,6 +18,18 @@ var tagCache struct {
 
 const tagCacheTTL = 5 * time.Minute
 
+func splitTagNames(tagNames []string) []string {
+	var tags []string
+	for _, tagName := range tagNames {
+		for _, tag := range strings.Split(tagName, ",") {
+			if tag = strings.TrimSpace(tag); tag != "" {
+				tags = append(tags, tag)
+			}
+		}
+	}
+	return tags
+}
+
 func getTagsFromCache() ([]models.Tag, error) {
 	tagCache.RLock()
 	if time.Now().Before(tagCache.expire) && len(tagCache.tags) > 0 {
